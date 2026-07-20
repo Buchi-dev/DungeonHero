@@ -3,17 +3,29 @@ plugins {
 }
 
 group = "com.dungeonhero"
-version = "0.1.0-SNAPSHOT"
+version = "0.1.6"
 
 repositories {
     maven {
         name = "papermc"
         url = uri("https://repo.papermc.io/repository/maven-public/")
     }
+    maven {
+        name = "lumine"
+        url = uri("https://mvn.lumine.io/repository/maven-public/")
+    }
+    maven {
+        name = "jitpack"
+        url = uri("https://jitpack.io")
+    }
 }
 
 dependencies {
     compileOnly("io.papermc.paper:paper-api:26.1.2.build.72-stable")
+    compileOnly("io.lumine:Mythic-Dist:5.12.1")
+    compileOnly("com.github.MilkBowl:VaultAPI:1.7") {
+        exclude(group = "org.bukkit", module = "bukkit")
+    }
 }
 
 java {
@@ -30,4 +42,3 @@ tasks.processResources {
         expand("version" to project.version)
     }
 }
-

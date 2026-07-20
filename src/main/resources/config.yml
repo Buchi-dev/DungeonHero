@@ -1,0 +1,83 @@
+DungeonHero:
+  Fragments:
+    "mm:HeroDamageFragment":
+      Type: fragment
+      Stat: DAMAGE
+      Amount: 2
+  Progression:
+    SwordXPItem: "mm:HeroSwordXP"
+    XPPerItem: 25
+    BaseXPRequired: 100
+    XPRequiredMultiplier: 1.25
+    MaxSwordLevel: 100
+  Ranks:
+    CoinName: "Dungeon Coins"
+    List:
+      "1":
+        Name: Novice
+        RequiredSwordLevel: 1
+        SwordLevelCap: 10
+        Cost: 0
+      "2":
+        Name: Apprentice
+        RequiredSwordLevel: 10
+        SwordLevelCap: 20
+        Cost: 100
+      "3":
+        Name: Adventurer
+        RequiredSwordLevel: 20
+        SwordLevelCap: 30
+        Cost: 250
+      "4":
+        Name: Warrior
+        RequiredSwordLevel: 30
+        SwordLevelCap: 40
+        Cost: 500
+      "5":
+        Name: Elite
+        RequiredSwordLevel: 40
+        SwordLevelCap: 50
+        Cost: 1000
+      "6":
+        Name: Champion
+        RequiredSwordLevel: 50
+        SwordLevelCap: 60
+        Cost: 2000
+      "7":
+        Name: Master
+        RequiredSwordLevel: 60
+        SwordLevelCap: 70
+        Cost: 4000
+      "8":
+        Name: Grandmaster
+        RequiredSwordLevel: 70
+        SwordLevelCap: 80
+        Cost: 8000
+      "9":
+        Name: Legend
+        RequiredSwordLevel: 80
+        SwordLevelCap: 90
+        Cost: 16000
+      "10":
+        Name: Hero
+        RequiredSwordLevel: 90
+        SwordLevelCap: 100
+        Cost: 32000
+  Hud:
+    UseVanillaXpBar: true
+    UpdateTicks: 10
+  MobScaling:
+    Enabled: true
+    SearchRadius: 32
+    PartyMode: AVERAGE
+    MaxPlayers: 5
+    BaseLevel: 1
+    SwordLevelsPerMobLevel: 2
+    DamageBonusWeight: 0.5
+    PrestigeLevelBonus: 5
+    MaxLevel: 100
+  Party:
+    Enabled: true
+    MaxSize: 5
+    RequireSameWorld: true
+    InvitationSeconds: 60

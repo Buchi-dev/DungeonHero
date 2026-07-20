@@ -15,7 +15,134 @@ On Windows:
 .\gradlew.bat build
 ```
 
-The plugin JAR is generated at `build/libs/DungeonHero-0.1.0-SNAPSHOT.jar`.
+The plugin JAR is generated at `build/libs/DungeonHero-0.1.6.jar`.
 
 Copy that JAR into the server's `plugins` directory and restart the server. Once loaded, `/dungeonhero` (or `/dh`) confirms that the plugin is active.
 
+## Current features
+
+- Players receive one unique Hero Sword when they join.
+- The Hero Sword cannot be dropped and is restored after death.
+- `/dungeonhero forge` (or `/dh forge`) opens the Hero Forge.
+- `/dh help` lists the available commands.
+- `/dh reload` reloads the plugin configuration (admin permission required).
+- `/dh give <player> mm:<item-id>` gives a configured MythicMobs fragment (admin permission required).
+- `/dh sword` shows the Hero Sword level and XP.
+- `/dh prestige` resets a capped Hero Sword to Level 1 and increases its permanent Prestige.
+- `/dh rank` shows Dungeon Rank, Sword Level cap, and the Vault economy balance used as Dungeon Coins.
+- `/dh rankup` spends Dungeon Coins to increase Dungeon Rank.
+- `/dh party` opens the party command help for parties of up to 5 players.
+- Player-facing rank, sword, help, and rank-up messages use formatted Adventure panels.
+- Hero Sword lore is grouped into progression, power, and forge sections.
+- The vanilla Minecraft XP level number and XP bar display the Hero Sword level and XP.
+- `/dh version` shows the installed plugin version.
+- MythicMobs custom items can be configured as fragments and dropped by MythicMobs mobs.
+- MythicMobs can drop a configured Hero Sword XP item that is automatically converted into sword XP when picked up.
+- Forging a Damage fragment updates the sword's actual main-hand attack damage.
+- Hero Sword tiers progress from Wood to Hero as the sword levels.
+- MythicMob levels can scale from nearby players' Sword Level, fragment Damage Bonus, and Prestige.
+- Dungeon Rank controls the player's maximum Sword Level until the next rank-up.
+
+## Five-player parties
+
+DungeonHero supports parties of up to five players. Party membership is session-based and is cleared when the party disbands or all members leave. Invitations expire after the configured time.
+
+```yaml
+DungeonHero:
+  Party:
+    Enabled: true
+    MaxSize: 5
+    RequireSameWorld: true
+    InvitationSeconds: 60
+  MobScaling:
+    PartyMode: AVERAGE
+    MaxPlayers: 5
+```
+
+Use `/dh party help` for all commands. When a MythicMob spawns near a party member, DungeonHero scales it using the nearby members of that party. `AVERAGE` is recommended so one highly progressed player does not make the dungeon unfair for newer friends. Sword XP and Vault balances remain personal; shared dungeon-completion rewards can be added once a dungeon completion event is connected.
+
+## Vault Dungeon Coins and ranks
+
+DungeonHero uses Vault's Economy service, so it works with the economy plugin registered through Vault instead of storing a second currency. The Vault balance is displayed as Dungeon Coins using the configured label. Vault and an economy provider must be installed on the server.
+
+The default progression has 10 ranks. A player must reach the current rank's Sword Level cap, then pay the next rank's configured cost:
+
+```yaml
+DungeonHero:
+  Ranks:
+    CoinName: "Dungeon Coins"
+    List:
+      "2":
+        Name: Apprentice
+        RequiredSwordLevel: 10
+        SwordLevelCap: 20
+        Cost: 100
+```
+
+Rank progress is stored in the player's persistent data, while Sword Level, XP, tiers, Prestige, and forged Damage Bonus remain stored on the Hero Sword.
+
+## MythicMobs fragments
+
+DungeonHero uses MythicMobs' internal item ID as `mm:<item-id>`. MythicMobs only defines and drops the item. Configure the Forge behavior in `plugins/DungeonHero/config.yml`:
+
+```yaml
+DungeonHero:
+  Fragments:
+    "mm:HeroDamageFragment":
+      Type: fragment
+      Stat: DAMAGE
+      Amount: 2
+```
+
+Then configure the MythicMob to drop `HeroDamageFragment` using MythicMobs' normal drop configuration. After changing DungeonHero's fragment mapping, run `/dh reload`; after changing the MythicMobs item, run `/mm reload`.
+
+## Hero Sword mob scaling
+
+DungeonHero finds nearby players within the configured radius when a MythicMob spawns and sets that mob's level from their strongest Hero Swords:
+
+```yaml
+DungeonHero:
+  MobScaling:
+    Enabled: true
+    SearchRadius: 32
+    PartyMode: AVERAGE
+    MaxPlayers: 5
+    BaseLevel: 1
+    SwordLevelsPerMobLevel: 2
+    DamageBonusWeight: 0.5
+    PrestigeLevelBonus: 5
+    MaxLevel: 100
+```
+
+`PartyMode` can be `NEAREST`, `AVERAGE`, or `MAX`. With the default configuration, every 2 points of party combat power adds one MythicMob level. Combat power is Sword Level plus half of the sword's Damage Bonus plus 5 per Prestige. MythicMobs then applies the mob's own `LevelModifiers` for health, damage, armor, and other stats.
+
+Prestige is available when the sword reaches `MaxSwordLevel`. It preserves fragment Damage Bonus, increases Prestige by one, and resets the sword to Level 1 and the Wood tier.
+
+## Sword XP
+
+Configure a MythicMobs custom item with the ID `HeroSwordXP`, then make MythicMobs mobs drop it. DungeonHero consumes that item when the player picks it up and awards XP to the player's Hero Sword.
+
+```yaml
+DungeonHero:
+  Progression:
+    SwordXPItem: "mm:HeroSwordXP"
+    XPPerItem: 25
+    BaseXPRequired: 100
+    XPRequiredMultiplier: 1.25
+    MaxSwordLevel: 100
+```
+
+The sword stores its level and XP as persistent item data. XP requirements increase each level, and XP collection stops at the configured maximum level.
+
+## Sword XP HUD
+
+The plugin reuses Minecraft's native XP HUD so the green number displays Sword Level and the XP bar displays progress toward the next Sword Level:
+
+```yaml
+DungeonHero:
+  Hud:
+    UseVanillaXpBar: true
+    UpdateTicks: 10
+```
+
+When enabled, normal Minecraft XP gain is blocked so the HUD remains dedicated to Sword XP. Set `UseVanillaXpBar` to `false` if the server needs to use normal Minecraft experience.

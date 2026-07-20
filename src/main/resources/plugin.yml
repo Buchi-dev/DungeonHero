@@ -5,9 +5,13 @@ description: A dungeon adventure plugin for Paper.
 api-version: '26.1'
 authors:
   - DungeonHero
+depend: [MythicMobs, Vault]
 commands:
   dungeonhero:
-    description: Shows DungeonHero status.
-    usage: /dungeonhero
+    description: Shows DungeonHero status and opens the Hero Forge.
+    usage: /dungeonhero [help|reload|forge|give|sword|rank|rankup|party|prestige|version]
     aliases: [dh]
-
+permissions:
+  dungeonhero.admin:
+    description: Allows administrative DungeonHero commands.
+    default: op
