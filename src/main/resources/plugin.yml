@@ -1,0 +1,13 @@
+name: DungeonHero
+version: '${version}'
+main: com.dungeonhero.DungeonHeroPlugin
+description: A dungeon adventure plugin for Paper.
+api-version: '26.1'
+authors:
+  - DungeonHero
+commands:
+  dungeonhero:
+    description: Shows DungeonHero status.
+    usage: /dungeonhero
+    aliases: [dh]
+
