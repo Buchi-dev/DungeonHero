@@ -4,3 +4,14 @@ out/
 *.iml
 .idea/
 
+# Compiled and IDE-generated files
+*.class
+.kotlin/
+.vscode/
+
+# Local operating-system files
+.DS_Store
+Thumbs.db
+
+# Local logs
+*.log
