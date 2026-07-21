@@ -16,7 +16,7 @@ On Windows:
 .\gradlew.bat build
 ```
 
-The plugin JAR is generated at `build/libs/DungeonHero-1.6.4.jar`.
+The plugin JAR is generated at `build/libs/DungeonHero-1.7.5.jar`.
 
 Copy that JAR into the server's `plugins` directory and restart the server. Once loaded, `/dungeonhero` (or `/dh`) confirms that the plugin is active.
 
@@ -68,6 +68,9 @@ paid twice.
 - `/dh balance` shows the sender's independent Dungeon Coin balance.
 - `/dh transfer <player> <amount>` transfers Dungeon Coins to another player.
 - `/dh rankup` spends Dungeon Coins to increase Dungeon Rank.
+- `/dh reputation` shows shared Dungeon Reputation, rank, and public event status.
+- `/dh reputation contract` shows the player's daily biome contract.
+- `/dh reputation top` shows the weekly Dungeon contributor leaderboard.
 - `/dh party` opens the party command help for parties of up to 5 players.
 - Player-facing rank, sword, help, and rank-up messages use formatted Adventure panels.
 - Hero Sword lore is grouped into progression, power, and forge sections.
@@ -83,6 +86,27 @@ paid twice.
 - Dungeon Rank controls the player's maximum Sword Level until the next rank-up.
 - Dungeon worlds keep the player's normal Minecraft inventory. The Hero Forge
   is optional, and MythicMobs fragments remain physical inventory items.
+
+## Dungeon Reputation
+
+Version 1.7.5 adds a server-wide Dungeon Reputation system for `dungeon_world`.
+Vanilla hostile mobs, DungeonHero Mythic variants, elites, five-minute
+minibosses, and rare biome bosses contribute to capped daily biome activity.
+Passive mobs and Mythic reinforcements do not generate reputation. Minibosses
+remain valuable after their daily reputation credit through their XP and loot.
+
+The system stores its progress separately in `plugins/DungeonHero/reputation.yml`.
+Players receive a rotating daily contract, personal weekly Contribution, and
+credit when fighting with nearby party members. Routine activity is capped so
+one mob farm cannot rush the shared ranks. Public events start on a timer,
+summon the matching rare biome boss when a player enters the target biome, and
+award a larger reputation bonus when the community completes both objectives.
+
+Reputation ranks are content and prestige milestones rather than raw combat
+stat bonuses: Uncharted, Recognized, Dangerous, Notorious, Renowned, and
+Legendary. The defaults can be tuned under `DungeonHero.Reputation` in
+`config.yml`. Use `/dh admin reputation set <amount>` or `add <amount>` for
+controlled testing; the command requires `dungeonhero.admin.reputation`.
 
 ## Source organization
 

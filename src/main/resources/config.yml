@@ -13,7 +13,12 @@ DungeonHero:
         - "&7Use this to increase Sword XP."
       XP: 25
     AutoMobKillXP: true
-    XPPerMobKill: 25
+    HostileMobKillXPOnly: true
+    XPPerMobKill: 10
+    MythicMobXP: 25
+    EliteXP: 100
+    MinibossXP: 400
+    RareBossXP: 1000
     BaseXPRequired: 100
     XPRequiredMultiplier: 1.25
     MaxSwordLevel: 100
@@ -81,16 +86,120 @@ DungeonHero:
     PartyMode: AVERAGE
     MaxPlayers: 5
     BaseLevel: 1
-    SwordLevelsPerMobLevel: 2
-    RankPowerBonus: 2.0
-    DamageBonusWeight: 0.5
-    PrestigeLevelBonus: 5
-    MaxLevel: 100
+    SwordLevelsPerMobLevel: 3.25
+    RankPowerBonus: 0.75
+    DamageBonusWeight: 0.12
+    PrestigeLevelBonus: 0.0
+    MaxLevel: 50
+    LevelOffsets:
+      Elite: 3
+      Miniboss: 6
+      RareBoss: 8
+    Debug: false
   Party:
     Enabled: true
     MaxSize: 5
     RequireSameWorld: true
     InvitationSeconds: 60
+  Reputation:
+    Enabled: true
+    Worlds:
+      - dungeon_world
+    TrackDungeonHeroPrefixes: true
+    HostileActivityTarget: 50
+    MythicActivityTarget: 10
+    EliteDailyLimit: 2
+    MinibossDailyLimit: 1
+    RareBossDailyLimit: 2
+    DailyContributionCap: 500
+    Rewards:
+      MinibossReputation: 50
+      RareBossReputation: 150
+    Contract:
+      HostileTarget: 40
+      MythicTarget: 10
+      EliteTarget: 1
+      ReputationReward: 30
+      ContributionReward: 40
+    PublicEvents:
+      Enabled: true
+      Goal: 75
+      ReputationReward: 250
+      DurationMinutes: 25
+      IntervalMinutes: 180
+      FirstDelayMinutes: 30
+    Prestige:
+      Enabled: true
+      RequiredReputation: 10000
+      MaxPrestige: 5
+    MythicMobIds:
+      Variants:
+        - DH_GroveStalker
+        - DH_MossboundSkeleton
+        - DH_AridHusk
+        - DH_BadlandsStray
+        - DH_BogboundZombie
+        - DH_MireWitch
+        - DH_FrostStray
+        - DH_FrostSpider
+        - DH_VineSpider
+        - DH_TempleWitch
+        - DH_TideDrowned
+        - DH_AbyssalGuardian
+        - DH_CursedVindicator
+        - DH_ShadowSpider
+        - DH_CaveSpider
+        - DH_DeepSilverfish
+        - DW_Cryptling
+        - DW_BoneArcher
+      Elites:
+        - DH_HeartwoodBrute
+        - DH_DuneColossus
+        - DH_MireAbomination
+        - DH_GlacierRavager
+        - DH_JadebackSentinel
+        - DH_AbyssalLeviathan
+        - DH_ManorRelicKeeper
+        - DH_CavernTyrant
+        - DW_SoulReaver
+      Minibosses:
+        - DH_BriarMatriarch
+        - DH_SunkenPharaoh
+        - DH_BogWitchQueen
+        - DH_FrostboundGoliath
+        - DH_TempleOverlord
+        - DH_OceanicLeviathan
+        - DH_PaleGardenWarden
+        - DH_DeepstoneBehemoth
+      RareBosses:
+        - DH_VerdantSovereign
+        - DH_SandstormTyrant
+        - DH_MireSovereign
+        - DH_WinterColossus
+        - DH_OvergrownTitan
+        - DH_AbyssalEmperor
+        - DH_PaleheartReaper
+        - DH_DeepstoneOverlord
+        - DW_CryptLord
+    Ranks:
+      "1":
+        Name: Uncharted
+        Required: 0
+      "2":
+        Name: Recognized
+        Required: 500
+      "3":
+        Name: Dangerous
+        Required: 1500
+      "4":
+        Name: Notorious
+        Required: 3500
+      "5":
+        Name: Renowned
+        Required: 6000
+      "6":
+        Name: Legendary
+        Required: 10000
   TargetDummy:
     Enabled: true
     Health: 1000

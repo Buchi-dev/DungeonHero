@@ -23,6 +23,19 @@ import java.util.stream.Collectors;
 
 public final class HeroSwordMobScaler implements Listener {
 
+    private static final Set<String> ELITE_IDS = Set.of(
+            "DH_HEARTWOODBRUTE", "DH_DUNECOLOSSUS", "DH_MIREABOMINATION", "DH_GLACIERRAVAGER",
+            "DH_JADEBACKSENTINEL", "DH_ABYSSALLEVIATHAN", "DH_MANORRELICKEEPER",
+            "DH_CAVERNTYRANT", "DW_SOULREAVER");
+    private static final Set<String> MINIBOSS_IDS = Set.of(
+            "DH_BRIARMATRIARCH", "DH_SUNKENPHARAOH", "DH_BOGWITCHQUEEN", "DH_FROSTBOUNDGOLIATH",
+            "DH_TEMPLEOVERLORD", "DH_OCEANICLEVIATHAN", "DH_PALEGARDENWARDEN",
+            "DH_DEEPSTONEBEHEMOTH");
+    private static final Set<String> RARE_BOSS_IDS = Set.of(
+            "DH_VERDANTSOVEREIGN", "DH_SANDSTORMTYRANT", "DH_MIRESOVEREIGN", "DH_WINTERCOLOSSUS",
+            "DH_OVERGROWNTITAN", "DH_ABYSSALEMPEROR", "DH_PALEHEARTREAPER",
+            "DH_DEEPSTONEOVERLORD", "DW_CRYPTLORD");
+
     private final JavaPlugin plugin;
     private final HeroItemService heroItemService;
     private final PartyService partyService;
@@ -39,6 +52,10 @@ public final class HeroSwordMobScaler implements Listener {
     private double damageBonusWeight;
     private double prestigeLevelBonus;
     private int maxLevel;
+    private int eliteLevelOffset;
+    private int minibossLevelOffset;
+    private int rareBossLevelOffset;
+    private boolean debug;
 
     public HeroSwordMobScaler(JavaPlugin plugin, HeroItemService heroItemService, PartyService partyService,
                               DungeonRankService dungeonRankService) {
@@ -60,15 +77,22 @@ public final class HeroSwordMobScaler implements Listener {
         maxPlayers = Math.max(1, plugin.getConfig().getInt("DungeonHero.MobScaling.MaxPlayers", 4));
         baseLevel = Math.max(1, plugin.getConfig().getInt("DungeonHero.MobScaling.BaseLevel", 1));
         swordLevelsPerMobLevel = Math.max(0.01,
-                plugin.getConfig().getDouble("DungeonHero.MobScaling.SwordLevelsPerMobLevel", 2));
+                plugin.getConfig().getDouble("DungeonHero.MobScaling.SwordLevelsPerMobLevel", 3.25));
         rankPowerBonus = Math.max(0, plugin.getConfig().getDouble(
-                "DungeonHero.MobScaling.RankPowerBonus", 2));
+                "DungeonHero.MobScaling.RankPowerBonus", 0.75));
         damageBonusWeight = Math.max(0, plugin.getConfig().getDouble(
-                "DungeonHero.MobScaling.DamageBonusWeight", 0.5));
+                "DungeonHero.MobScaling.DamageBonusWeight", 0.12));
         prestigeLevelBonus = Math.max(0, plugin.getConfig().getDouble(
-                "DungeonHero.MobScaling.PrestigeLevelBonus", 5));
+                "DungeonHero.MobScaling.PrestigeLevelBonus", 0));
         maxLevel = Math.max(baseLevel,
-                plugin.getConfig().getInt("DungeonHero.MobScaling.MaxLevel", 100));
+                plugin.getConfig().getInt("DungeonHero.MobScaling.MaxLevel", 50));
+        eliteLevelOffset = Math.max(0, plugin.getConfig().getInt(
+                "DungeonHero.MobScaling.LevelOffsets.Elite", 3));
+        minibossLevelOffset = Math.max(eliteLevelOffset, plugin.getConfig().getInt(
+                "DungeonHero.MobScaling.LevelOffsets.Miniboss", 6));
+        rareBossLevelOffset = Math.max(minibossLevelOffset, plugin.getConfig().getInt(
+                "DungeonHero.MobScaling.LevelOffsets.RareBoss", 8));
+        debug = plugin.getConfig().getBoolean("DungeonHero.MobScaling.Debug", false);
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -91,8 +115,16 @@ public final class HeroSwordMobScaler implements Listener {
             case MAX -> nearbyPlayers.stream().mapToDouble(CombatPower::power).max().orElse(1);
             case AVERAGE -> nearbyPlayers.stream().mapToDouble(CombatPower::power).average().orElse(1);
         };
-        int level = baseLevel + (int) Math.floor(Math.max(0, combatPower - 1) / swordLevelsPerMobLevel);
-        event.setMobLevel(Math.max(baseLevel, Math.min(maxLevel, level)));
+        String mobId = event.getMobType() == null ? "" : event.getMobType().getInternalName();
+        int level = baseLevel + (int) Math.floor(Math.max(0, combatPower - 1) / swordLevelsPerMobLevel)
+                + levelOffset(mobId);
+        int boundedLevel = Math.max(baseLevel, Math.min(maxLevel, level));
+        event.setMobLevel(boundedLevel);
+        if (debug) {
+            plugin.getLogger().info("Scaled " + mobId + " for " + nearbyPlayers.size()
+                    + " player(s): power=" + String.format(Locale.ROOT, "%.2f", combatPower)
+                    + ", level=" + boundedLevel);
+        }
     }
 
     private List<CombatPower> findNearbyPlayers(Location location) {
@@ -114,6 +146,20 @@ public final class HeroSwordMobScaler implements Listener {
                 + (Math.max(0, dungeonRankService.getRank(player) - 1) * rankPowerBonus)
                 + (heroItemService.getDamageBonus(sword) * damageBonusWeight)
                 + (heroItemService.getSwordPrestige(sword) * prestigeLevelBonus);
+    }
+
+    private int levelOffset(String internalName) {
+        String id = internalName == null ? "" : internalName.toUpperCase(Locale.ROOT);
+        if (RARE_BOSS_IDS.contains(id)) {
+            return rareBossLevelOffset;
+        }
+        if (MINIBOSS_IDS.contains(id)) {
+            return minibossLevelOffset;
+        }
+        if (ELITE_IDS.contains(id)) {
+            return eliteLevelOffset;
+        }
+        return 0;
     }
 
     private record CombatPower(Player player, double power, double distanceSquared) {

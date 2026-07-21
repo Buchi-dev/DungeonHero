@@ -5,6 +5,7 @@ import com.dungeonhero.feature.forge.ForgeGui;
 import com.dungeonhero.feature.coins.DungeonCoinService;
 import com.dungeonhero.feature.party.PartyService;
 import com.dungeonhero.feature.rank.DungeonRankService;
+import com.dungeonhero.feature.reputation.DungeonReputationService;
 import com.dungeonhero.feature.sword.HeroItemService;
 import com.dungeonhero.feature.sword.HeroPlayerListener;
 import com.dungeonhero.feature.sword.HeroSwordStorage;
@@ -22,6 +23,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 public final class DungeonHeroPlugin extends JavaPlugin {
 
     private GuiManager guiManager;
+    private DungeonReputationService dungeonReputationService;
 
     @Override
     public void onEnable() {
@@ -36,6 +38,7 @@ public final class DungeonHeroPlugin extends JavaPlugin {
         ForgeGui forgeGui = new ForgeGui(this, guiManager, heroItemService,
                 mythicFragmentService, heroSwordStorage);
         PartyService partyService = new PartyService(this);
+        dungeonReputationService = new DungeonReputationService(this, partyService);
         TrainingDummyService trainingDummyService = new TrainingDummyService(this, heroItemService);
         SwordXpItemService swordXpItemService = new SwordXpItemService(this);
         SwordProgressionService swordProgressionService = new SwordProgressionService(this, heroItemService,
@@ -52,7 +55,9 @@ public final class DungeonHeroPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(heroSwordMobScaler, this);
         getServer().getPluginManager().registerEvents(swordHudService, this);
         getServer().getPluginManager().registerEvents(partyService, this);
+        getServer().getPluginManager().registerEvents(dungeonReputationService, this);
         getServer().getPluginManager().registerEvents(trainingDummyService, this);
+        dungeonReputationService.start();
 
         long hudUpdateTicks = Math.max(1, getConfig().getLong("DungeonHero.Hud.UpdateTicks", 10));
         getServer().getScheduler().runTaskTimer(this, swordHudService::syncOnlinePlayers,
@@ -61,17 +66,20 @@ public final class DungeonHeroPlugin extends JavaPlugin {
                 heroPlayerListener, mythicFragmentService, heroSwordMobScaler,
                 swordXpItemService, swordHudService, swordProgressionService, dungeonRankService, partyService,
                 trainingDummyService, forgeGui,
-                messageService, dungeonCoinService);
+                messageService, dungeonCoinService, dungeonReputationService);
         if (getCommand("dungeonhero") != null) {
             getCommand("dungeonhero").setExecutor(command);
             getCommand("dungeonhero").setTabCompleter(command);
         }
 
-        getLogger().info("DungeonHero enabled. Hero Sword, Forge, party, rank, and MythicMobs systems are ready.");
+        getLogger().info("DungeonHero enabled. Hero Sword, Forge, party, rank, reputation, and MythicMobs systems are ready.");
     }
 
     @Override
     public void onDisable() {
+        if (dungeonReputationService != null) {
+            dungeonReputationService.close();
+        }
         if (guiManager != null) {
             guiManager.closeAll();
         }

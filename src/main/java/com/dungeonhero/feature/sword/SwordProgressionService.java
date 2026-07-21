@@ -2,6 +2,7 @@ package com.dungeonhero.feature.sword;
 
 import com.dungeonhero.feature.rank.DungeonRankService;
 import com.dungeonhero.messaging.DungeonHeroMessages;
+import io.lumine.mythic.bukkit.events.MythicMobDeathEvent;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -12,11 +13,30 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.entity.Mob;
+import org.bukkit.entity.Monster;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Set;
+import java.util.UUID;
+
 public final class SwordProgressionService implements Listener {
+
+    private static final Set<String> RARE_BOSS_IDS = Set.of(
+            "DH_VERDANTSOVEREIGN", "DH_SANDSTORMTYRANT", "DH_MIRESOVEREIGN",
+            "DH_WINTERCOLOSSUS", "DH_OVERGROWNTITAN", "DH_ABYSSALEMPEROR",
+            "DH_PALEHEARTREAPER", "DH_DEEPSTONEOVERLORD", "DW_CRYPTLORD");
+    private static final Set<String> MINIBOSS_IDS = Set.of(
+            "DH_BRIARMATRIARCH", "DH_SUNKENPHARAOH", "DH_BOGWITCHQUEEN", "DH_FROSTBOUNDGOLIATH",
+            "DH_TEMPLEOVERLORD", "DH_OCEANICLEVIATHAN", "DH_PALEGARDENWARDEN", "DH_DEEPSTONEBEHEMOTH");
+    private static final Set<String> ELITE_IDS = Set.of(
+            "DH_HEARTWOODBRUTE", "DH_DUNECOLOSSUS",
+            "DH_MIREABOMINATION", "DH_GLACIERRAVAGER", "DH_JADEBACKSENTINEL",
+            "DH_ABYSSALLEVIATHAN", "DH_MANORRELICKEEPER", "DH_CAVERNTYRANT", "DW_SOULREAVER");
 
     private final JavaPlugin plugin;
     private final HeroItemService heroItemService;
@@ -25,11 +45,17 @@ public final class SwordProgressionService implements Listener {
     private final HeroSwordStorage heroSwordStorage;
 
     private boolean autoMobKillXp;
+    private boolean hostileMobKillXpOnly;
     private int xpPerItem;
     private int xpPerMobKill;
+    private int mythicMobXp;
+    private int eliteXp;
+    private int minibossXp;
+    private int rareBossXp;
     private int baseXpRequired;
     private double xpRequiredMultiplier;
     private int maxSwordLevel;
+    private final Set<UUID> mythicDeathsAwaitingVanillaCheck = new HashSet<>();
 
     public SwordProgressionService(JavaPlugin plugin, HeroItemService heroItemService,
                                    SwordXpItemService swordXpItemService,
@@ -46,10 +72,20 @@ public final class SwordProgressionService implements Listener {
     public void reload() {
         autoMobKillXp = plugin.getConfig().getBoolean(
                 "DungeonHero.Progression.AutoMobKillXP", true);
+        hostileMobKillXpOnly = plugin.getConfig().getBoolean(
+                "DungeonHero.Progression.HostileMobKillXPOnly", true);
         swordXpItemService.reload();
         xpPerItem = swordXpItemService.getConfiguredXp();
         xpPerMobKill = Math.max(1, plugin.getConfig().getInt(
                 "DungeonHero.Progression.XPPerMobKill", xpPerItem));
+        mythicMobXp = Math.max(1, plugin.getConfig().getInt(
+                "DungeonHero.Progression.MythicMobXP", 25));
+        eliteXp = Math.max(mythicMobXp, plugin.getConfig().getInt(
+                "DungeonHero.Progression.EliteXP", 100));
+        minibossXp = Math.max(eliteXp, plugin.getConfig().getInt(
+                "DungeonHero.Progression.MinibossXP", 400));
+        rareBossXp = Math.max(minibossXp, plugin.getConfig().getInt(
+                "DungeonHero.Progression.RareBossXP", 1000));
         baseXpRequired = Math.max(1, plugin.getConfig().getInt(
                 "DungeonHero.Progression.BaseXPRequired", 100));
         xpRequiredMultiplier = Math.max(1.0, plugin.getConfig().getDouble(
@@ -60,12 +96,47 @@ public final class SwordProgressionService implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onMobDeath(EntityDeathEvent event) {
-        if (!autoMobKillXp || !(event.getEntity() instanceof Mob mob)) {
+        if (!autoMobKillXp || !(event.getEntity() instanceof Mob mob)
+                || (hostileMobKillXpOnly && !(mob instanceof Monster))) {
+            return;
+        }
+
+        UUID entityId = mob.getUniqueId();
+        if (mythicDeathsAwaitingVanillaCheck.contains(entityId) || isActiveMythicMob(entityId)) {
             return;
         }
 
         Player player = mob.getKiller();
         if (player == null) {
+            return;
+        }
+
+        awardExperience(player, xpPerMobKill);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onMythicMobDeath(MythicMobDeathEvent event) {
+        if (!autoMobKillXp || !(event.getEntity() instanceof LivingEntity entity)) {
+            return;
+        }
+
+        UUID entityId = entity.getUniqueId();
+        mythicDeathsAwaitingVanillaCheck.add(entityId);
+        plugin.getServer().getScheduler().runTaskLater(plugin,
+                () -> mythicDeathsAwaitingVanillaCheck.remove(entityId), 2L);
+
+        if (!(event.getKiller() instanceof Player player)) {
+            return;
+        }
+        String internalName = event.getMobType() == null ? "" : event.getMobType().getInternalName();
+        int reward = mythicXpFor(internalName);
+        if (reward > 0) {
+            awardExperience(player, reward);
+        }
+    }
+
+    private void awardExperience(Player player, int amount) {
+        if (amount <= 0) {
             return;
         }
 
@@ -85,7 +156,7 @@ public final class SwordProgressionService implements Listener {
             return;
         }
 
-        ProgressionResult result = addExperience(sword, xpPerMobKill, playerLevelCap);
+        ProgressionResult result = addExperience(sword, amount, playerLevelCap);
         inventory.setItem(swordSlot, result.sword());
         heroSwordStorage.save(player, result.sword());
         if (result.levelsGained() > 0) {
@@ -94,6 +165,31 @@ public final class SwordProgressionService implements Listener {
         }
         player.sendActionBar(DungeonHeroMessages.compactSwordActionBar(result.sword(), heroItemService, this,
                 playerLevelCap));
+    }
+
+    private int mythicXpFor(String internalName) {
+        String id = internalName == null ? "" : internalName.toUpperCase(Locale.ROOT);
+        if (id.isBlank() || (!id.startsWith("DH_") && !id.startsWith("DW_"))) {
+            return 0;
+        }
+        if (RARE_BOSS_IDS.contains(id)) {
+            return rareBossXp;
+        }
+        if (MINIBOSS_IDS.contains(id)) {
+            return minibossXp;
+        }
+        if (ELITE_IDS.contains(id)) {
+            return eliteXp;
+        }
+        return mythicMobXp;
+    }
+
+    private boolean isActiveMythicMob(UUID entityId) {
+        try {
+            return io.lumine.mythic.bukkit.MythicBukkit.inst().getMobManager().isActiveMob(entityId);
+        } catch (RuntimeException exception) {
+            return false;
+        }
     }
 
     @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
