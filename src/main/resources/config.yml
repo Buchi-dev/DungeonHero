@@ -16,30 +16,8 @@ DungeonHero:
     Enabled: true
     Worlds:
       - dungeon_world
-    HeroSwordSlot: 5
-    FragmentBagSlot: 1
-    SupplyBagSlot: 2
-    SupplyHotbarSlots: [3, 4, 6, 7, 8]
-    ReservedSlot: 9
-    MaxUniqueSupplyItems: 5
     FragmentVaultSlots: 27
     FragmentVaultStackSize: 64
-    LoseSuppliesOnDeath: false
-    AllowedSupplyItems:
-      - BREAD
-      - COOKED_BEEF
-      - COOKED_CHICKEN
-      - COOKED_PORKCHOP
-      - COOKED_MUTTON
-      - COOKED_RABBIT
-      - COOKED_COD
-      - COOKED_SALMON
-      - GOLDEN_APPLE
-      - POTION
-      - SPLASH_POTION
-      - LINGERING_POTION
-      - FIREWORK_ROCKET
-      - ELYTRA
   Ranks:
     CoinName: "Dungeon Coins"
     List:

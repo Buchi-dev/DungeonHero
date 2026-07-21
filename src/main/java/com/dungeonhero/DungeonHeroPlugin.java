@@ -14,7 +14,7 @@ import java.util.List;
 public final class DungeonHeroPlugin extends JavaPlugin implements TabExecutor {
 
     private static final List<String> SUBCOMMANDS = List.of(
-            "help", "reload", "menu", "loadout", "vault", "forge", "give", "sword", "rank", "rankup", "party", "prestige", "dummy", "version"
+            "help", "reload", "menu", "vault", "forge", "give", "sword", "rank", "rankup", "party", "prestige", "dummy", "version"
     );
     private static final List<String> PARTY_SUBCOMMANDS = List.of(
             "create", "invite", "accept", "info", "leave", "kick", "disband", "help"
@@ -70,13 +70,6 @@ public final class DungeonHeroPlugin extends JavaPlugin implements TabExecutor {
     }
 
     @Override
-    public void onDisable() {
-        if (dungeonInventoryService != null) {
-            dungeonInventoryService.saveOnlineDungeonPlayers();
-        }
-    }
-
-    @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!command.getName().equalsIgnoreCase("dungeonhero")) {
             return false;
@@ -116,15 +109,6 @@ public final class DungeonHeroPlugin extends JavaPlugin implements TabExecutor {
                 dungeonInventoryService.openMenu(player);
             } else {
                 sender.sendMessage(Component.text("Only players can open the Dungeon Menu.", NamedTextColor.RED));
-            }
-            return true;
-        }
-
-        if (args[0].equalsIgnoreCase("loadout")) {
-            if (sender instanceof Player player) {
-                dungeonInventoryService.openLoadout(player);
-            } else {
-                sender.sendMessage(Component.text("Only players can open the Supply Loadout.", NamedTextColor.RED));
             }
             return true;
         }

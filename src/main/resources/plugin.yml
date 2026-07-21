@@ -9,7 +9,7 @@ depend: [MythicMobs, Vault]
 commands:
   dungeonhero:
     description: Shows DungeonHero status and opens the Hero Forge.
-    usage: /dungeonhero [help|reload|menu|loadout|vault|forge|give|sword|rank|rankup|party|prestige|dummy|version]
+    usage: /dungeonhero [help|reload|menu|vault|forge|give|sword|rank|rankup|party|prestige|dummy|version]
     aliases: [dh]
 permissions:
   dungeonhero.admin:

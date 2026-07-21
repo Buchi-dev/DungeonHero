@@ -231,11 +231,6 @@ public final class PartyService implements Listener {
         return maxSize;
     }
 
-    public boolean isLeader(Player player) {
-        Party party = getParty(player);
-        return party != null && party.leader().equals(player.getUniqueId());
-    }
-
     public void broadcast(Party party, Component message) {
         for (Player member : getMembers(party)) {
             member.sendMessage(message);

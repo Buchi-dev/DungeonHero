@@ -270,11 +270,6 @@ public final class ForgeMenu implements InventoryHolder {
                 return;
             }
 
-            if (menu.dungeonForge && rawSlot >= INVENTORY_SIZE) {
-                event.setCancelled(true);
-                return;
-            }
-
             if (menu.dungeonForge && (rawSlot == SWORD_SLOT || rawSlot == FRAGMENT_SLOT)) {
                 event.setCancelled(true);
                 return;

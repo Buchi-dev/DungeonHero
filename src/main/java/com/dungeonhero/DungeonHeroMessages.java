@@ -114,7 +114,6 @@ public final class DungeonHeroMessages {
         sendPanel(sender, "DUNGEON HERO", NamedTextColor.GOLD, List.of(
                 command("/dh forge", "Open the Hero Forge"),
                 command("/dh menu", "Open the Dungeon Menu"),
-                command("/dh loadout", "Manage dungeon supplies"),
                 command("/dh vault", "View stored fragments"),
                 command("/dh sword", "Show Hero Sword progression"),
                 command("/dh rank", "Show Dungeon Rank and balance"),

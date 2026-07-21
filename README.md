@@ -78,12 +78,12 @@ paid twice.
 - Hero Sword tiers progress from Wood to Hero as the sword levels.
 - MythicMob levels can scale from nearby players' Sword Level, fragment Damage Bonus, and Prestige.
 - Dungeon Rank controls the player's maximum Sword Level until the next rank-up.
-- Dungeon worlds use a separate RPG loadout with a fixed Hero Sword, Dungeon Menu,
-  Fragment Vault, and five-unique-item Supply Loadout.
+- Dungeon worlds keep the player's normal Minecraft inventory. The Dungeon Menu,
+  Fragment Vault, and Hero Forge are optional dungeon tools.
 
-## Dungeon loadout inventory
+## Dungeon world tools
 
-Version 1.6.2 adds a dungeon-only inventory profile. Configure the world names in
+Configure the dungeon world names in
 `plugins/DungeonHero/config.yml`:
 
 ```yaml
@@ -92,41 +92,20 @@ DungeonHero:
     Enabled: true
     Worlds:
       - dungeon_world
-    HeroSwordSlot: 5
-    FragmentBagSlot: 1
-    SupplyBagSlot: 2
-    SupplyHotbarSlots: [3, 4, 6, 7, 8]
-    ReservedSlot: 9
-    MaxUniqueSupplyItems: 5
     FragmentVaultSlots: 27
     FragmentVaultStackSize: 64
-    LoseSuppliesOnDeath: false
 ```
 
-When a player enters a configured dungeon world, DungeonHero stores their normal
-inventory and loads this layout:
+Players can bring, move, store, swap, and use any items normally in dungeon
+worlds. DungeonHero does not replace, lock, or snapshot their inventory.
 
-```text
-[Dungeon Menu] [Reserved] [Item 1] [Item 2] [HERO SWORD] [Item 3] [Item 4] [Item 5] [Reserved]
-      1              2        3        4          5           6        7        8         9
-```
-
-Use `/dh menu` or right-click the Dungeon Menu item. The menu opens the Fragment
-Vault, Supply Loadout, and Hero Forge. Fragments are stored as numeric balances
+Use `/dh menu` to open the optional Dungeon Menu. It provides the Fragment Vault
+and Hero Forge. Fragments are stored as numeric balances
 per configured MythicMobs fragment type, but the vault deliberately behaves like
 a 27-slot inventory with 64 fragments per slot. This gives a clear, finite RPG
 capacity while still allowing automatic pickup. If the vault is full, the
 unstored remainder stays on the ground. `/dh vault` shows the stored counts.
-`/dh loadout` opens the preparation GUI; the top five slots are the
-selected loadout, and the lower staging area contains allowed items from the
-player's stored normal inventory. Only configured supply materials are accepted,
-and the selected loadout is limited to five unique item types.
 
-The Hero Sword and Dungeon Menu cannot be moved or dropped in the dungeon.
-Ordinary item pickups are blocked so the five-item loadout cannot be bypassed.
-Leaving the world restores the player's normal inventory and saves the dungeon
-loadout for the next run. The Hero Sword is retained through death; set
-`LoseSuppliesOnDeath` to `true` if dungeon supplies should be cleared on death.
 `/dh forge` consumes fragments directly from the Fragment Vault. The Forge now
 supports batch forging: use `-10`, `-1`, `+1`, `+10`, or `MAX`, then click the
 Forge button. The preview shows the total damage bonus and fragment cost before
