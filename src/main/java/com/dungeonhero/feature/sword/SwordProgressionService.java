@@ -1,7 +1,6 @@
 package com.dungeonhero.feature.sword;
 
 import com.dungeonhero.feature.rank.DungeonRankService;
-import com.dungeonhero.integration.mythicmobs.MythicFragmentService;
 import com.dungeonhero.messaging.DungeonHeroMessages;
 
 import net.kyori.adventure.text.Component;
@@ -21,11 +20,10 @@ public final class SwordProgressionService implements Listener {
 
     private final JavaPlugin plugin;
     private final HeroItemService heroItemService;
-    private final MythicFragmentService mythicFragmentService;
+    private final SwordXpItemService swordXpItemService;
     private final DungeonRankService dungeonRankService;
     private final HeroSwordStorage heroSwordStorage;
 
-    private String swordXpItemId;
     private boolean autoMobKillXp;
     private int xpPerItem;
     private int xpPerMobKill;
@@ -34,24 +32,22 @@ public final class SwordProgressionService implements Listener {
     private int maxSwordLevel;
 
     public SwordProgressionService(JavaPlugin plugin, HeroItemService heroItemService,
-                                   MythicFragmentService mythicFragmentService,
+                                   SwordXpItemService swordXpItemService,
                                    DungeonRankService dungeonRankService,
                                    HeroSwordStorage heroSwordStorage) {
         this.plugin = plugin;
         this.heroItemService = heroItemService;
-        this.mythicFragmentService = mythicFragmentService;
+        this.swordXpItemService = swordXpItemService;
         this.dungeonRankService = dungeonRankService;
         this.heroSwordStorage = heroSwordStorage;
         reload();
     }
 
     public void reload() {
-        swordXpItemId = plugin.getConfig().getString(
-                "DungeonHero.Progression.SwordXPItem", "mm:HeroSwordXP");
         autoMobKillXp = plugin.getConfig().getBoolean(
                 "DungeonHero.Progression.AutoMobKillXP", true);
-        xpPerItem = Math.max(1, plugin.getConfig().getInt(
-                "DungeonHero.Progression.XPPerItem", 25));
+        swordXpItemService.reload();
+        xpPerItem = swordXpItemService.getConfiguredXp();
         xpPerMobKill = Math.max(1, plugin.getConfig().getInt(
                 "DungeonHero.Progression.XPPerMobKill", xpPerItem));
         baseXpRequired = Math.max(1, plugin.getConfig().getInt(
@@ -72,9 +68,6 @@ public final class SwordProgressionService implements Listener {
         if (player == null) {
             return;
         }
-
-        // Automatic mode replaces the physical HeroSwordXP drop.
-        removeSwordXpDrops(event);
 
         PlayerInventory inventory = player.getInventory();
         int swordSlot = findStrongestSwordSlot(inventory);
@@ -106,7 +99,7 @@ public final class SwordProgressionService implements Listener {
     @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
     public void onSwordXpPickup(EntityPickupItemEvent event) {
         if (!(event.getEntity() instanceof Player player)
-                || !mythicFragmentService.isItemId(event.getItem().getItemStack(), swordXpItemId)) {
+                || !swordXpItemService.isSwordXpItem(event.getItem().getItemStack())) {
             return;
         }
 
@@ -125,7 +118,8 @@ public final class SwordProgressionService implements Listener {
             return;
         }
 
-        int xpAmount = event.getItem().getItemStack().getAmount() * xpPerItem;
+        int xpAmount = event.getItem().getItemStack().getAmount()
+                * swordXpItemService.getXpAmount(event.getItem().getItemStack());
         ProgressionResult result = addExperience(sword, xpAmount, playerLevelCap);
         inventory.setItem(swordSlot, result.sword());
         heroSwordStorage.save(player, result.sword());
@@ -239,10 +233,6 @@ public final class SwordProgressionService implements Listener {
             }
         }
         return strongestSlot;
-    }
-
-    private void removeSwordXpDrops(EntityDeathEvent event) {
-        event.getDrops().removeIf(item -> mythicFragmentService.isItemId(item, swordXpItemId));
     }
 
     private boolean isStronger(ItemStack first, ItemStack second) {

@@ -7,7 +7,6 @@ Starting point for a dungeon adventure plugin built for Paper 26.1.2.
 - Java 25
 - Paper 26.1.2 (API build 72)
 - MythicMobs 5.12.1
-- Vault with an economy provider
 
 ## Build
 
@@ -33,8 +32,8 @@ run this from the project root:
 .\tools\Install-DungeonHero.ps1
 ```
 
-The installer targets `D:\Minecraft FIles (Server)\New` by default, verifies
-Vault, installs MythicMobs 5.12.1 from the supplied parent folder when it is
+The installer targets `D:\Minecraft FIles (Server)\New` by default, installs
+MythicMobs 5.12.1 from the supplied parent folder when it is
 not already present, and copies only DungeonHero-owned MythicMobs files. It
 does not overwrite DungeonCore content. Restart the server and run `/mm reload`
 after installation.
@@ -65,7 +64,9 @@ paid twice.
 - `/dh dummy remove-all` removes all DungeonHero Training Dummies in loaded worlds (admin permission required; console-safe).
 - `/dh sword` shows the Hero Sword level and XP.
 - `/dh prestige` resets a capped Hero Sword to Level 1 and increases its permanent Prestige.
-- `/dh rank` shows Dungeon Rank, Sword Level cap, and the Vault economy balance used as Dungeon Coins.
+- `/dh rank` shows Dungeon Rank, Sword Level cap, and the Dungeon Coin balance.
+- `/dh balance` shows the sender's independent Dungeon Coin balance.
+- `/dh transfer <player> <amount>` transfers Dungeon Coins to another player.
 - `/dh rankup` spends Dungeon Coins to increase Dungeon Rank.
 - `/dh party` opens the party command help for parties of up to 5 players.
 - Player-facing rank, sword, help, and rank-up messages use formatted Adventure panels.
@@ -87,37 +88,20 @@ paid twice.
 
 The Java source is organized by ownership boundary:
 
-- `feature/sword`, `feature/forge`, `feature/rank`, `feature/party`, `feature/dungeoninventory`, and `feature/trainingdummy` contain gameplay features.
-- `integration/mythicmobs` and `integration/vault` contain external-plugin adapters.
+- `feature/sword`, `feature/forge`, `feature/rank`, `feature/party`, `feature/coins`, and `feature/trainingdummy` contain gameplay features.
+- `integration/mythicmobs` contains the remaining external-plugin adapter.
 - `command` contains `/dh` routing and administrative command behavior.
 - `messaging` contains player-facing Adventure panels.
 - `DungeonHeroPlugin` is intentionally limited to dependency construction, listener registration, and scheduler setup.
 
 The `dungeonhero.admin` permission remains the full administrator permission and inherits the granular reload, give, and dummy cleanup permissions. Dummy cleanup only removes entities marked with DungeonHero's persistent data keys.
 
-## Dungeon world tools
+## Inventory and forge
 
-Configure the dungeon world names in
-`plugins/DungeonHero/config.yml`:
-
-```yaml
-DungeonHero:
-  DungeonInventory:
-    Enabled: true
-    FragmentVault:
-      Enabled: false
-    Worlds:
-      - dungeon_world
-```
-
-Players can bring, move, store, swap, and use any items normally in dungeon
-worlds. DungeonHero does not replace, lock, or snapshot their inventory.
-
-Use `/dh menu` to open the optional Dungeon Menu. Fragments remain physical
-MythicMobs items in the player's normal inventory. `/dh forge` consumes physical
-fragments and supports batch forging: use `-10`, `-1`, `+1`, `+10`, or `MAX`, then
-click the Forge button. The preview shows the total damage bonus and fragment
-cost before the batch is committed.
+DungeonHero uses the player's normal Minecraft inventory. It does not replace,
+lock, snapshot, or vault items. `/dh forge` consumes physical MythicMobs
+fragments placed in the forge and supports batch forging with `-10`, `-1`, `+1`,
+`+10`, or `MAX`.
 
 ## Five-player parties
 
@@ -135,11 +119,11 @@ DungeonHero:
     MaxPlayers: 5
 ```
 
-Use `/dh party help` for all commands. When a MythicMob spawns near a party member, DungeonHero scales it using the nearby members of that party. `AVERAGE` is recommended so one highly progressed player does not make the dungeon unfair for newer friends. Sword XP and Vault balances remain personal; shared dungeon-completion rewards can be added once a dungeon completion event is connected.
+Use `/dh party help` for all commands. When a MythicMob spawns near a party member, DungeonHero scales it using the nearby members of that party. `AVERAGE` is recommended so one highly progressed player does not make the dungeon unfair for newer friends. Sword XP and Dungeon Coin balances remain personal; shared dungeon-completion rewards can be added once a dungeon completion event is connected.
 
-## Vault Dungeon Coins and ranks
+## Dungeon Coins and ranks
 
-DungeonHero uses Vault's Economy service, so it works with the economy plugin registered through Vault instead of storing a second currency. The Vault balance is displayed as Dungeon Coins using the configured label. Vault and an economy provider must be installed on the server.
+DungeonHero stores Dungeon Coins independently in `plugins/DungeonHero/coins.yml`, keyed by player UUID. No economy plugin is required.
 
 The default progression has 10 ranks. A player must reach the current rank's Sword Level cap, then pay the next rank's configured cost:
 
@@ -205,21 +189,25 @@ Prestige is available when the sword reaches `MaxSwordLevel`. It preserves fragm
 
 ## Sword XP
 
-By default, player-killed mobs automatically grant Sword XP to the killer's strongest Hero Sword. No physical XP item is created or required. The legacy `HeroSwordXP` pickup flow can still be used by disabling automatic mob XP.
+By default, player-killed mobs automatically grant Sword XP directly to the killer's strongest Hero Sword. No XP item is created or dropped by mob kills. Native Sword XP items remain available for manual or administrative use.
 
 ```yaml
 DungeonHero:
   Progression:
-    SwordXPItem: "mm:HeroSwordXP"
+    SwordXPItem:
+      Material: EXPERIENCE_BOTTLE
+      Name: "&aHero Sword XP"
+      Lore:
+        - "&7Use this to increase Sword XP."
+      XP: 25
     AutoMobKillXP: true
-    XPPerItem: 25
     XPPerMobKill: 25
     BaseXPRequired: 100
     XPRequiredMultiplier: 1.25
     MaxSwordLevel: 100
 ```
 
-The sword stores its level and XP as persistent item data. XP requirements increase each level, and XP collection stops at the configured maximum level. `XPPerMobKill` controls the automatic reward; `XPPerItem` controls the legacy pickup reward.
+The sword stores its level and XP as persistent item data. XP requirements increase each level, and XP collection stops at the configured maximum level. `XPPerMobKill` controls the direct mob-kill reward. Native XP items store their own XP amount in DungeonHero persistent item data and can be given with `/dh give-xp <player> [xp]`.
 
 ## Sword XP HUD
 

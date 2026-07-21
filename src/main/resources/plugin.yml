@@ -5,11 +5,11 @@ description: A dungeon adventure plugin for Paper.
 api-version: '26.1'
 authors:
   - DungeonHero
-depend: [MythicMobs, Vault]
+depend: [MythicMobs]
 commands:
   dungeonhero:
     description: Shows DungeonHero status and opens the Hero Forge.
-    usage: /dungeonhero [help|reload|menu|forge|give|sword|rank|rankup|party|prestige|dummy|version]
+    usage: /dungeonhero [help|reload|forge|give|give-xp|sword|rank|rankup|party|prestige|dummy|version]
     aliases: [dh]
 permissions:
   dungeonhero.admin:
@@ -18,6 +18,7 @@ permissions:
     children:
       dungeonhero.admin.reload: true
       dungeonhero.admin.give: true
+      dungeonhero.admin.coins: true
       dungeonhero.admin.dummy.remove: true
       dungeonhero.admin.dummy.remove-all: true
   dungeonhero.admin.reload:
@@ -26,9 +27,21 @@ permissions:
   dungeonhero.admin.give:
     description: Allows giving configured MythicMobs items.
     default: false
+  dungeonhero.admin.coins:
+    description: Allows setting, adding, and taking Dungeon Coins.
+    default: false
   dungeonhero.admin.dummy.remove:
     description: Allows removing Training Dummies in the current world.
     default: false
   dungeonhero.admin.dummy.remove-all:
     description: Allows removing all DungeonHero Training Dummies from loaded worlds.
     default: false
+  dungeonhero.coins.balance:
+    description: Allows viewing your Dungeon Coin balance.
+    default: true
+  dungeonhero.coins.balance.others:
+    description: Allows viewing another player’s Dungeon Coin balance.
+    default: op
+  dungeonhero.coins.transfer:
+    description: Allows transferring Dungeon Coins to another player.
+    default: true

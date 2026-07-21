@@ -23,9 +23,9 @@ repositories {
 dependencies {
     compileOnly("io.papermc.paper:paper-api:26.1.2.build.72-stable")
     compileOnly("io.lumine:Mythic-Dist:5.12.1")
-    compileOnly("com.github.MilkBowl:VaultAPI:1.7") {
-        exclude(group = "org.bukkit", module = "bukkit")
-    }
+    testRuntimeOnly("io.papermc.paper:paper-api:26.1.2.build.72-stable")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.11.4")
 }
 
 java {
@@ -35,6 +35,10 @@ java {
 tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
     options.release.set(25)
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 tasks.processResources {

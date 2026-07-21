@@ -1,6 +1,6 @@
 package com.dungeonhero.command;
 
-import com.dungeonhero.feature.dungeoninventory.DungeonInventoryService;
+import com.dungeonhero.feature.coins.DungeonCoinService;
 import com.dungeonhero.feature.forge.ForgeMenu;
 import com.dungeonhero.feature.party.PartyService;
 import com.dungeonhero.feature.rank.DungeonRankService;
@@ -9,6 +9,7 @@ import com.dungeonhero.feature.sword.HeroPlayerListener;
 import com.dungeonhero.feature.sword.HeroSwordStorage;
 import com.dungeonhero.feature.sword.SwordHudService;
 import com.dungeonhero.feature.sword.SwordProgressionService;
+import com.dungeonhero.feature.sword.SwordXpItemService;
 import com.dungeonhero.feature.trainingdummy.TrainingDummyService;
 import com.dungeonhero.integration.mythicmobs.HeroSwordMobScaler;
 import com.dungeonhero.integration.mythicmobs.MythicFragmentService;
@@ -21,6 +22,7 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabExecutor;
 import org.bukkit.entity.Player;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.List;
@@ -34,8 +36,12 @@ public final class DungeonHeroCommand implements TabExecutor {
     private static final String GIVE_PERMISSION = "dungeonhero.admin.give";
     private static final String DUMMY_REMOVE_PERMISSION = "dungeonhero.admin.dummy.remove";
     private static final String DUMMY_REMOVE_ALL_PERMISSION = "dungeonhero.admin.dummy.remove-all";
+    private static final String BALANCE_PERMISSION = "dungeonhero.coins.balance";
+    private static final String BALANCE_OTHERS_PERMISSION = "dungeonhero.coins.balance.others";
+    private static final String TRANSFER_PERMISSION = "dungeonhero.coins.transfer";
+    private static final String ADMIN_COINS_PERMISSION = "dungeonhero.admin.coins";
     private static final List<String> SUBCOMMANDS = List.of(
-            "help", "reload", "menu", "forge", "give", "sword", "rank", "rankup", "party", "prestige", "dummy", "version"
+            "help", "reload", "forge", "give", "give-xp", "sword", "rank", "rankup", "balance", "transfer", "admin", "party", "prestige", "dummy", "version"
     );
     private static final List<String> PARTY_SUBCOMMANDS = List.of(
             "create", "invite", "accept", "info", "leave", "kick", "disband", "help"
@@ -45,42 +51,45 @@ public final class DungeonHeroCommand implements TabExecutor {
     private final HeroItemService heroItemService;
     private final HeroSwordStorage heroSwordStorage;
     private final HeroPlayerListener heroPlayerListener;
-    private final DungeonInventoryService dungeonInventoryService;
     private final MythicFragmentService mythicFragmentService;
     private final HeroSwordMobScaler heroSwordMobScaler;
+    private final SwordXpItemService swordXpItemService;
     private final SwordHudService swordHudService;
     private final SwordProgressionService swordProgressionService;
     private final DungeonRankService dungeonRankService;
     private final PartyService partyService;
     private final TrainingDummyService trainingDummyService;
     private final MessageService messageService;
+    private final DungeonCoinService dungeonCoinService;
 
     public DungeonHeroCommand(JavaPlugin plugin,
                               HeroItemService heroItemService,
                               HeroSwordStorage heroSwordStorage,
                               HeroPlayerListener heroPlayerListener,
-                              DungeonInventoryService dungeonInventoryService,
                               MythicFragmentService mythicFragmentService,
                               HeroSwordMobScaler heroSwordMobScaler,
+                              SwordXpItemService swordXpItemService,
                               SwordHudService swordHudService,
                               SwordProgressionService swordProgressionService,
                               DungeonRankService dungeonRankService,
                               PartyService partyService,
                               TrainingDummyService trainingDummyService,
-                              MessageService messageService) {
+                              MessageService messageService,
+                              DungeonCoinService dungeonCoinService) {
         this.plugin = plugin;
         this.heroItemService = heroItemService;
         this.heroSwordStorage = heroSwordStorage;
         this.heroPlayerListener = heroPlayerListener;
-        this.dungeonInventoryService = dungeonInventoryService;
         this.mythicFragmentService = mythicFragmentService;
         this.heroSwordMobScaler = heroSwordMobScaler;
+        this.swordXpItemService = swordXpItemService;
         this.swordHudService = swordHudService;
         this.swordProgressionService = swordProgressionService;
         this.dungeonRankService = dungeonRankService;
         this.partyService = partyService;
         this.trainingDummyService = trainingDummyService;
         this.messageService = messageService;
+        this.dungeonCoinService = dungeonCoinService;
     }
 
     @Override
@@ -107,12 +116,18 @@ public final class DungeonHeroCommand implements TabExecutor {
             return true;
         }
 
-        if (args[0].equalsIgnoreCase("menu")) {
-            if (sender instanceof Player player) {
-                dungeonInventoryService.openMenu(player);
-            } else {
-                sender.sendMessage(Component.text("Only players can open the Dungeon Menu.", NamedTextColor.RED));
-            }
+        if (args[0].equalsIgnoreCase("balance")) {
+            showBalance(sender, args);
+            return true;
+        }
+
+        if (args[0].equalsIgnoreCase("transfer")) {
+            transferCoins(sender, args);
+            return true;
+        }
+
+        if (args[0].equalsIgnoreCase("admin")) {
+            handleAdmin(sender, args);
             return true;
         }
 
@@ -159,8 +174,7 @@ public final class DungeonHeroCommand implements TabExecutor {
                 sender.sendMessage(Component.text("Only players can use the Hero Forge.", NamedTextColor.RED));
                 return true;
             }
-            ForgeMenu.open(player, heroItemService, mythicFragmentService, heroSwordStorage,
-                    dungeonInventoryService);
+            ForgeMenu.open(player, heroItemService, mythicFragmentService, heroSwordStorage);
             return true;
         }
 
@@ -171,6 +185,11 @@ public final class DungeonHeroCommand implements TabExecutor {
 
         if (args[0].equalsIgnoreCase("give")) {
             giveItem(sender, args);
+            return true;
+        }
+
+        if (args[0].equalsIgnoreCase("give-xp")) {
+            giveXpItem(sender, args);
             return true;
         }
 
@@ -188,8 +207,7 @@ public final class DungeonHeroCommand implements TabExecutor {
         heroSwordMobScaler.reload();
         swordHudService.reload();
         trainingDummyService.reload();
-        dungeonInventoryService.reload();
-        dungeonInventoryService.syncOnlinePlayers();
+        dungeonCoinService.reload();
         sender.sendMessage(messageService.text("command.reload_complete",
                 "DungeonHero configuration reloaded. Use /mm reload for MythicMobs changes.")
                 .color(NamedTextColor.GREEN));
@@ -228,6 +246,171 @@ public final class DungeonHeroCommand implements TabExecutor {
 
         heroItemService.giveOrDrop(target, item.get());
         sender.sendMessage(Component.text("Gave " + args[2] + " to " + target.getName() + ".", NamedTextColor.GREEN));
+    }
+
+    private void giveXpItem(CommandSender sender, String[] args) {
+        if (!requireAdmin(sender, GIVE_PERMISSION)) {
+            return;
+        }
+        if (args.length < 2 || args.length > 3) {
+            sender.sendMessage(Component.text("Usage: /dh give-xp <player> [xp]", NamedTextColor.YELLOW));
+            return;
+        }
+        Player target = Bukkit.getPlayerExact(args[1]);
+        if (target == null) {
+            sender.sendMessage(Component.text("That player is not online.", NamedTextColor.RED));
+            return;
+        }
+
+        int xpAmount = swordXpItemService.getConfiguredXp();
+        if (args.length == 3) {
+            try {
+                xpAmount = Integer.parseInt(args[2]);
+            } catch (NumberFormatException exception) {
+                sender.sendMessage(Component.text("XP must be a positive whole number.", NamedTextColor.RED));
+                return;
+            }
+        }
+        if (xpAmount < 1) {
+            sender.sendMessage(Component.text("XP must be a positive whole number.", NamedTextColor.RED));
+            return;
+        }
+
+        heroItemService.giveOrDrop(target, swordXpItemService.createItem(xpAmount));
+        sender.sendMessage(Component.text("Gave a " + xpAmount + " XP Sword XP item to "
+                + target.getName() + ".", NamedTextColor.GREEN));
+    }
+
+    private void showBalance(CommandSender sender, String[] args) {
+        if (args.length == 1) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage(Component.text("Usage: /dh balance <player>", NamedTextColor.YELLOW));
+                return;
+            }
+            if (!requirePermission(sender, BALANCE_PERMISSION)) {
+                return;
+            }
+            sendBalance(sender, player.getUniqueId(), player.getName());
+            return;
+        }
+        if (args.length != 2 || !requirePermission(sender, BALANCE_OTHERS_PERMISSION)) {
+            return;
+        }
+        OfflinePlayer target = findOfflinePlayer(sender, args[1]);
+        if (target != null) {
+            sendBalance(sender, target.getUniqueId(), target.getName() == null ? args[1] : target.getName());
+        }
+    }
+
+    private void sendBalance(CommandSender sender, java.util.UUID playerId, String name) {
+        sender.sendMessage(Component.text(name + " has "
+                + dungeonCoinService.format(dungeonCoinService.getBalance(playerId))
+                + " Dungeon Coins.", NamedTextColor.GOLD));
+    }
+
+    private void transferCoins(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(Component.text("Only players can transfer Dungeon Coins.", NamedTextColor.RED));
+            return;
+        }
+        if (!requirePermission(sender, TRANSFER_PERMISSION)) {
+            return;
+        }
+        if (args.length != 3) {
+            sender.sendMessage(Component.text("Usage: /dh transfer <player> <amount>", NamedTextColor.YELLOW));
+            return;
+        }
+
+        OfflinePlayer target = findOfflinePlayer(sender, args[1]);
+        Long amount = parseAmount(sender, args[2], false);
+        if (target == null || amount == null) {
+            return;
+        }
+        DungeonCoinService.TransferResult result = dungeonCoinService.transfer(
+                player.getUniqueId(), target.getUniqueId(), amount);
+        switch (result.status()) {
+            case SUCCESS -> sender.sendMessage(Component.text("Transferred "
+                    + dungeonCoinService.format(amount) + " Dungeon Coins to "
+                    + (target.getName() == null ? args[1] : target.getName()) + ".", NamedTextColor.GREEN));
+            case SELF_TRANSFER -> sender.sendMessage(Component.text("You cannot transfer Dungeon Coins to yourself.",
+                    NamedTextColor.RED));
+            case INSUFFICIENT_FUNDS -> sender.sendMessage(Component.text("You do not have enough Dungeon Coins.",
+                    NamedTextColor.RED));
+            case TARGET_BALANCE_LIMIT -> sender.sendMessage(Component.text("The target balance is too large.",
+                    NamedTextColor.RED));
+            case STORAGE_FAILURE -> sender.sendMessage(Component.text("Dungeon Coins could not be saved.",
+                    NamedTextColor.RED));
+            case INVALID_AMOUNT -> sender.sendMessage(Component.text("Amount must be positive.", NamedTextColor.RED));
+        }
+    }
+
+    private void handleAdmin(CommandSender sender, String[] args) {
+        if (args.length < 2 || !args[1].equalsIgnoreCase("coins")) {
+            sender.sendMessage(Component.text(
+                    "Usage: /dh admin coins [set|add|take] <player> <amount>", NamedTextColor.YELLOW));
+            return;
+        }
+        if (!requirePermission(sender, ADMIN_COINS_PERMISSION)) {
+            return;
+        }
+        if (args.length != 5) {
+            sender.sendMessage(Component.text(
+                    "Usage: /dh admin coins [set|add|take] <player> <amount>", NamedTextColor.YELLOW));
+            return;
+        }
+
+        String operation = args[2].toLowerCase(Locale.ROOT);
+        OfflinePlayer target = findOfflinePlayer(sender, args[3]);
+        Long amount = parseAmount(sender, args[4], operation.equals("set"));
+        if (target == null || amount == null || !List.of("set", "add", "take").contains(operation)) {
+            if (target != null && amount != null) {
+                sender.sendMessage(Component.text("Operation must be set, add, or take.", NamedTextColor.YELLOW));
+            }
+            return;
+        }
+
+        boolean changed;
+        switch (operation) {
+            case "set" -> changed = dungeonCoinService.setBalance(target.getUniqueId(), amount);
+            case "add" -> changed = dungeonCoinService.add(target.getUniqueId(), amount);
+            case "take" -> changed = dungeonCoinService.withdraw(target.getUniqueId(), amount);
+            default -> changed = false;
+        }
+        if (!changed) {
+            sender.sendMessage(Component.text("The Dungeon Coin operation could not be completed.", NamedTextColor.RED));
+            return;
+        }
+
+        String targetName = target.getName() == null ? args[3] : target.getName();
+        plugin.getLogger().info(sender.getName() + " used coins " + operation + " on " + targetName
+                + ": " + amount);
+        sender.sendMessage(Component.text("Updated " + targetName + " to "
+                + dungeonCoinService.format(dungeonCoinService.getBalance(target.getUniqueId()))
+                + " Dungeon Coins.", NamedTextColor.GREEN));
+    }
+
+    private OfflinePlayer findOfflinePlayer(CommandSender sender, String name) {
+        OfflinePlayer target = Bukkit.getOfflinePlayer(name);
+        if (!target.isOnline() && !target.hasPlayedBefore()) {
+            sender.sendMessage(Component.text("That player has not joined this server.", NamedTextColor.RED));
+            return null;
+        }
+        return target;
+    }
+
+    private Long parseAmount(CommandSender sender, String raw, boolean allowZero) {
+        try {
+            long amount = Long.parseLong(raw);
+            if (amount < 0 || (!allowZero && amount == 0)) {
+                throw new NumberFormatException();
+            }
+            return amount;
+        } catch (NumberFormatException exception) {
+            sender.sendMessage(Component.text(
+                    allowZero ? "Amount must be a non-negative whole number." : "Amount must be a positive whole number.",
+                    NamedTextColor.RED));
+            return null;
+        }
     }
 
     private void handleDummy(CommandSender sender, String[] args) {
@@ -352,6 +535,13 @@ public final class DungeonHeroCommand implements TabExecutor {
     }
 
     private boolean requireAdmin(CommandSender sender, String permission) {
+        if (requirePermission(sender, permission)) {
+            return true;
+        }
+        return false;
+    }
+
+    private boolean requirePermission(CommandSender sender, String permission) {
         if (sender.hasPermission(ADMIN_PERMISSION) || sender.hasPermission(permission)) {
             return true;
         }
@@ -381,6 +571,30 @@ public final class DungeonHeroCommand implements TabExecutor {
         if (args.length == 2 && args[0].equalsIgnoreCase("give")
                 && (sender.hasPermission(ADMIN_PERMISSION) || sender.hasPermission(GIVE_PERMISSION))) {
             return complete(args[1], Bukkit.getOnlinePlayers().stream().map(Player::getName).toList());
+        }
+
+        if (args.length == 2 && args[0].equalsIgnoreCase("give-xp")
+                && (sender.hasPermission(ADMIN_PERMISSION) || sender.hasPermission(GIVE_PERMISSION))) {
+            return complete(args[1], Bukkit.getOnlinePlayers().stream().map(Player::getName).toList());
+        }
+
+        if (args.length == 2 && (args[0].equalsIgnoreCase("balance")
+                || args[0].equalsIgnoreCase("transfer"))) {
+            return complete(args[1], Bukkit.getOnlinePlayers().stream().map(Player::getName).toList());
+        }
+
+        if (args.length == 2 && args[0].equalsIgnoreCase("admin")) {
+            return complete(args[1], List.of("coins"));
+        }
+
+        if (args.length == 3 && args[0].equalsIgnoreCase("admin")
+                && args[1].equalsIgnoreCase("coins")) {
+            return complete(args[2], List.of("set", "add", "take"));
+        }
+
+        if (args.length == 4 && args[0].equalsIgnoreCase("admin")
+                && args[1].equalsIgnoreCase("coins")) {
+            return complete(args[3], Bukkit.getOnlinePlayers().stream().map(Player::getName).toList());
         }
 
         if (args.length == 3 && args[0].equalsIgnoreCase("give")

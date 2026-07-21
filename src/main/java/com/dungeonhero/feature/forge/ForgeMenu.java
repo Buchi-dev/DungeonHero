@@ -1,6 +1,5 @@
 package com.dungeonhero.feature.forge;
 
-import com.dungeonhero.feature.dungeoninventory.DungeonInventoryService;
 import com.dungeonhero.feature.sword.HeroItemService;
 import com.dungeonhero.feature.sword.HeroSwordStorage;
 import com.dungeonhero.integration.mythicmobs.MythicFragmentService;
@@ -41,38 +40,22 @@ public final class ForgeMenu implements InventoryHolder {
     private final HeroItemService heroItemService;
     private final MythicFragmentService mythicFragmentService;
     private final HeroSwordStorage heroSwordStorage;
-    private final DungeonInventoryService dungeonInventoryService;
-    private final boolean dungeonForge;
     private Inventory inventory;
-    private Player forgePlayer;
     private int batchAmount = 1;
 
     private ForgeMenu(HeroItemService heroItemService, MythicFragmentService mythicFragmentService,
-                      HeroSwordStorage heroSwordStorage, DungeonInventoryService dungeonInventoryService,
-                      boolean dungeonForge) {
+                      HeroSwordStorage heroSwordStorage) {
         this.heroItemService = heroItemService;
         this.mythicFragmentService = mythicFragmentService;
         this.heroSwordStorage = heroSwordStorage;
-        this.dungeonInventoryService = dungeonInventoryService;
-        this.dungeonForge = dungeonForge;
     }
 
     public static void open(Player player, HeroItemService heroItemService,
                             MythicFragmentService mythicFragmentService,
-                            HeroSwordStorage heroSwordStorage,
-                            DungeonInventoryService dungeonInventoryService) {
-        boolean dungeonForge = dungeonInventoryService != null
-                && dungeonInventoryService.isDungeonWorld(player)
-                && dungeonInventoryService.isFragmentVaultEnabled();
-        ForgeMenu menu = new ForgeMenu(heroItemService, mythicFragmentService, heroSwordStorage,
-                dungeonInventoryService, dungeonForge);
-        menu.forgePlayer = player;
+                            HeroSwordStorage heroSwordStorage) {
+        ForgeMenu menu = new ForgeMenu(heroItemService, mythicFragmentService, heroSwordStorage);
         menu.inventory = Bukkit.createInventory(menu, INVENTORY_SIZE,
                 Component.text("Hero Forge", NamedTextColor.DARK_PURPLE));
-        if (dungeonForge) {
-            menu.inventory.setItem(SWORD_SLOT, dungeonInventoryService.takeHeroSwordForForge(player));
-            menu.inventory.setItem(FRAGMENT_SLOT, dungeonInventoryService.getAvailableForgeFragment(player));
-        }
         menu.refresh();
         player.openInventory(menu.inventory);
     }
@@ -86,13 +69,6 @@ public final class ForgeMenu implements InventoryHolder {
         for (int slot = 0; slot < INVENTORY_SIZE; slot++) {
             if (slot != SWORD_SLOT && slot != OUTPUT_SLOT && slot != FRAGMENT_SLOT && !isControlSlot(slot)) {
                 inventory.setItem(slot, namedItem(Material.GRAY_STAINED_GLASS_PANE, " ", NamedTextColor.GRAY));
-            }
-        }
-
-        if (dungeonForge) {
-            Player player = (Player) inventory.getViewers().stream().findFirst().orElse(forgePlayer);
-            if (player != null) {
-                inventory.setItem(FRAGMENT_SLOT, dungeonInventoryService.getAvailableForgeFragment(player));
             }
         }
 
@@ -120,8 +96,7 @@ public final class ForgeMenu implements InventoryHolder {
             inventory.setItem(FORGE_BUTTON_SLOT,
                     namedItem(Material.ANVIL, "Forge", NamedTextColor.DARK_GRAY,
                             available <= 0 && inspection.isValid()
-                                    ? (dungeonForge ? "Your Fragment Vault is empty."
-                                    : "Place a stack of fragments.")
+                                    ? "Place a stack of fragments."
                                     : inspection.error()));
         }
         refreshBatchControls(available, canForge);
@@ -144,26 +119,17 @@ public final class ForgeMenu implements InventoryHolder {
         int available = availableFragments(inspection, fragment);
         int quantity = Math.max(1, Math.min(batchAmount, available));
         if (available <= 0) {
-            player.sendMessage(Component.text(dungeonForge
-                    ? "You do not have that fragment in your Fragment Vault."
-                    : "Place a stack of fragments in the forge.", NamedTextColor.RED));
+            player.sendMessage(Component.text("Place a stack of fragments in the forge.", NamedTextColor.RED));
             refresh();
             return;
         }
-        if (dungeonForge && !dungeonInventoryService.consumeForgeFragments(player, upgrade, quantity)) {
-            player.sendMessage(Component.text("You do not have enough of that fragment in your Fragment Vault.",
-                    NamedTextColor.RED));
-            refresh();
-            return;
-        }
-
         ItemStack upgradedSword = heroItemService.forge(sword, upgrade, quantity);
         inventory.setItem(SWORD_SLOT, upgradedSword);
         heroSwordStorage.save(player, upgradedSword);
-        if (!dungeonForge && fragment.getAmount() > quantity) {
+        if (fragment.getAmount() > quantity) {
             fragment.setAmount(fragment.getAmount() - quantity);
             inventory.setItem(FRAGMENT_SLOT, fragment);
-        } else if (!dungeonForge) {
+        } else {
             inventory.setItem(FRAGMENT_SLOT, null);
         }
         batchAmount = 1;
@@ -176,10 +142,6 @@ public final class ForgeMenu implements InventoryHolder {
     private int availableFragments(MythicFragmentService.Inspection inspection, ItemStack fragment) {
         if (!inspection.isValid()) {
             return 0;
-        }
-        if (dungeonForge) {
-            Player player = (Player) inventory.getViewers().stream().findFirst().orElse(forgePlayer);
-            return player == null ? 0 : dungeonInventoryService.getFragmentCount(player, inspection.upgrade().id());
         }
         return fragment == null ? 0 : Math.max(0, fragment.getAmount());
     }
@@ -277,11 +239,6 @@ public final class ForgeMenu implements InventoryHolder {
                 return;
             }
 
-            if (menu.dungeonForge && (rawSlot == SWORD_SLOT || rawSlot == FRAGMENT_SLOT)) {
-                event.setCancelled(true);
-                return;
-            }
-
             if (rawSlot == SWORD_SLOT || rawSlot == FRAGMENT_SLOT) {
                 Bukkit.getScheduler().runTask(plugin, menu::refresh);
                 return;
@@ -312,12 +269,8 @@ public final class ForgeMenu implements InventoryHolder {
 
             ItemStack sword = event.getInventory().getItem(SWORD_SLOT);
             ItemStack fragment = event.getInventory().getItem(FRAGMENT_SLOT);
-            if (menu.dungeonForge) {
-                menu.dungeonInventoryService.returnHeroSwordFromForge(player, sword);
-            } else {
-                returnItem(player, sword);
-                returnItem(player, fragment);
-            }
+            returnItem(player, sword);
+            returnItem(player, fragment);
             event.getInventory().setItem(SWORD_SLOT, null);
             event.getInventory().setItem(FRAGMENT_SLOT, null);
             event.getInventory().setItem(OUTPUT_SLOT, null);

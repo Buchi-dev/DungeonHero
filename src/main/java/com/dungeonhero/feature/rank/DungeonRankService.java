@@ -1,7 +1,7 @@
 package com.dungeonhero.feature.rank;
 
 import com.dungeonhero.feature.sword.HeroItemService;
-import com.dungeonhero.integration.vault.VaultEconomyService;
+import com.dungeonhero.feature.coins.DungeonCoinService;
 
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
@@ -18,15 +18,15 @@ public final class DungeonRankService {
 
     private final JavaPlugin plugin;
     private final HeroItemService heroItemService;
-    private final VaultEconomyService economyService;
+    private final DungeonCoinService coinService;
     private final NamespacedKey rankKey;
     private final List<RankDefinition> ranks = new ArrayList<>();
     private String coinName;
 
-    public DungeonRankService(JavaPlugin plugin, HeroItemService heroItemService) {
+    public DungeonRankService(JavaPlugin plugin, HeroItemService heroItemService, DungeonCoinService coinService) {
         this.plugin = plugin;
         this.heroItemService = heroItemService;
-        this.economyService = new VaultEconomyService(plugin);
+        this.coinService = coinService;
         this.rankKey = new NamespacedKey(plugin, "dungeon_rank");
         reload();
     }
@@ -48,7 +48,7 @@ public final class DungeonRankService {
                             rank.getString("Name", "Rank " + number),
                             Math.max(1, rank.getInt("RequiredSwordLevel", number == 1 ? 1 : 10)),
                             Math.max(1, rank.getInt("SwordLevelCap", 100)),
-                            Math.max(0, rank.getDouble("Cost", 0))));
+                            Math.max(0, rank.getLong("Cost", 0))));
                 } catch (NumberFormatException ignored) {
                     plugin.getLogger().warning("Ignoring invalid DungeonHero rank key: " + key);
                 }
@@ -80,16 +80,16 @@ public final class DungeonRankService {
         return Math.min(configuredCap, getCurrentRank(player).swordLevelCap());
     }
 
-    public double getBalance(Player player) {
-        return economyService.getBalance(player);
+    public long getBalance(Player player) {
+        return coinService.getBalance(player.getUniqueId());
     }
 
     public String getCoinName() {
         return coinName;
     }
 
-    public String formatCoins(double amount) {
-        return economyService.format(amount);
+    public String formatCoins(long amount) {
+        return coinService.format(amount);
     }
 
     public RankUpResult rankUp(Player player) {
@@ -108,16 +108,12 @@ public final class DungeonRankService {
             return new RankUpResult(RankUpStatus.SWORD_LEVEL, current, next,
                     next.requiredSwordLevel(), swordLevel, next.cost(), getBalance(player));
         }
-        if (!economyService.isAvailable()) {
-            return new RankUpResult(RankUpStatus.ECONOMY_UNAVAILABLE, current, next,
-                    next.requiredSwordLevel(), swordLevel, next.cost(), 0);
-        }
-        double balance = getBalance(player);
+        long balance = getBalance(player);
         if (balance < next.cost()) {
             return new RankUpResult(RankUpStatus.INSUFFICIENT_FUNDS, current, next,
                     next.requiredSwordLevel(), swordLevel, next.cost(), balance);
         }
-        if (!economyService.withdraw(player, next.cost())) {
+        if (!coinService.withdraw(player.getUniqueId(), next.cost())) {
             return new RankUpResult(RankUpStatus.PAYMENT_FAILED, current, next,
                     next.requiredSwordLevel(), swordLevel, next.cost(), getBalance(player));
         }
@@ -143,13 +139,13 @@ public final class DungeonRankService {
             defaults.add(new RankDefinition(number, names[number - 1],
                     number == 1 ? 1 : (number - 1) * 10,
                     number * 10,
-                    number == 1 ? 0 : Math.pow(2, number + 5)));
+                    number == 1 ? 0 : (long) Math.pow(2, number + 5)));
         }
         return defaults;
     }
 
     public record RankDefinition(int number, String name, int requiredSwordLevel,
-                                 int swordLevelCap, double cost) {
+                                 int swordLevelCap, long cost) {
     }
 
     public enum RankUpStatus {
@@ -157,13 +153,12 @@ public final class DungeonRankService {
         MAX_RANK,
         NO_SWORD,
         SWORD_LEVEL,
-        ECONOMY_UNAVAILABLE,
         INSUFFICIENT_FUNDS,
         PAYMENT_FAILED
     }
 
     public record RankUpResult(RankUpStatus status, RankDefinition current, RankDefinition next,
                                int requiredSwordLevel, int actualSwordLevel,
-                               double cost, double balance) {
+                               long cost, long balance) {
     }
 }

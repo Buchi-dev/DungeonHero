@@ -101,16 +101,12 @@ public final class DungeonHeroMessages {
                     line("Required Level", String.valueOf(result.requiredSwordLevel()), NamedTextColor.YELLOW),
                     line("Your Level", String.valueOf(result.actualSwordLevel()), NamedTextColor.RED)
             ));
-            case ECONOMY_UNAVAILABLE -> sendPanel(player, "RANK UP FAILED", NamedTextColor.RED, List.of(
-                    Component.text("No Vault economy provider is available.", NamedTextColor.YELLOW),
-                    Component.text("Configure Vault and an economy plugin first.", NamedTextColor.GRAY)
-            ));
             case INSUFFICIENT_FUNDS -> sendPanel(player, "RANK UP FAILED", NamedTextColor.RED, List.of(
                     line("Required", rankService.formatCoins(result.cost()) + " " + rankService.getCoinName(), NamedTextColor.YELLOW),
                     line("Balance", rankService.formatCoins(result.balance()) + " " + rankService.getCoinName(), NamedTextColor.RED)
             ));
             case PAYMENT_FAILED -> sendPanel(player, "RANK UP FAILED", NamedTextColor.RED, List.of(
-                    Component.text("The economy provider rejected the transaction.", NamedTextColor.YELLOW),
+                    Component.text("The Dungeon Coin transaction could not be saved.", NamedTextColor.YELLOW),
                     Component.text("Your balance was not changed by DungeonHero.", NamedTextColor.GRAY)
             ));
         }
@@ -119,16 +115,18 @@ public final class DungeonHeroMessages {
     public static void sendHelp(CommandSender sender) {
         sendPanel(sender, "DUNGEON HERO", NamedTextColor.GOLD, List.of(
                 command("/dh forge", "Open the Hero Forge"),
-                command("/dh menu", "Open the Dungeon Menu"),
                 command("/dh sword", "Show Hero Sword progression"),
                 command("/dh rank", "Show Dungeon Rank and balance"),
                 command("/dh rankup", "Spend Dungeon Coins to rank up"),
+                command("/dh balance", "Show Dungeon Coin balance"),
+                command("/dh transfer <player> <amount>", "Transfer Dungeon Coins"),
                 command("/dh party", "Play together with up to 5 heroes"),
                 command("/dh prestige", "Prestige a max-level sword"),
                 command("/dh dummy", "Test sword damage on a Training Dummy"),
                 command("/dh version", "Show the plugin version"),
                 command("/dh reload", "Reload configuration (admin)"),
-                command("/dh give", "Give a MythicMobs item (admin)")
+                command("/dh give", "Give a MythicMobs item (admin)"),
+                command("/dh give-xp", "Give a native Sword XP item (admin)")
         ));
     }
 

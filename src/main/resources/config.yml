@@ -6,21 +6,17 @@ DungeonHero:
       Stat: DAMAGE
       Amount: 2
   Progression:
-    SwordXPItem: "mm:HeroSwordXP"
+    SwordXPItem:
+      Material: EXPERIENCE_BOTTLE
+      Name: "&aHero Sword XP"
+      Lore:
+        - "&7Use this to increase Sword XP."
+      XP: 25
     AutoMobKillXP: true
-    XPPerItem: 25
     XPPerMobKill: 25
     BaseXPRequired: 100
     XPRequiredMultiplier: 1.25
     MaxSwordLevel: 100
-  DungeonInventory:
-    Enabled: true
-    FragmentVault:
-      Enabled: false
-    Worlds:
-      - dungeon_world
-    FragmentVaultSlots: 27
-    FragmentVaultStackSize: 64
   Ranks:
     CoinName: "Dungeon Coins"
     List:

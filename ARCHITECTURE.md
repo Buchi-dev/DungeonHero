@@ -12,11 +12,10 @@ com.dungeonhero
 │   ├── forge
 │   ├── rank
 │   ├── party
-│   ├── dungeoninventory
+│   ├── coins
 │   └── trainingdummy
 ├── integration             external plugin adapters
-│   ├── mythicmobs
-│   └── vault
+│   └── mythicmobs
 └── messaging               Adventure message panels
 ```
 
@@ -26,6 +25,7 @@ com.dungeonhero
 
 - `dungeonhero.admin.reload`
 - `dungeonhero.admin.give`
+- `dungeonhero.admin.coins`
 - `dungeonhero.admin.dummy.remove`
 - `dungeonhero.admin.dummy.remove-all`
 
