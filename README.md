@@ -61,6 +61,8 @@ paid twice.
 - `/dh help` lists the available commands.
 - `/dh reload` reloads the plugin configuration (admin permission required).
 - `/dh give <player> mm:<item-id>` gives a configured MythicMobs fragment (admin permission required).
+- `/dh dummy remove` removes DungeonHero Training Dummies in the current world (admin permission required).
+- `/dh dummy remove-all` removes all DungeonHero Training Dummies in loaded worlds (admin permission required; console-safe).
 - `/dh sword` shows the Hero Sword level and XP.
 - `/dh prestige` resets a capped Hero Sword to Level 1 and increases its permanent Prestige.
 - `/dh rank` shows Dungeon Rank, Sword Level cap, and the Vault economy balance used as Dungeon Coins.
@@ -78,8 +80,20 @@ paid twice.
 - Hero Sword tiers progress from Wood to Hero as the sword levels.
 - MythicMob levels can scale from nearby players' Sword Level, fragment Damage Bonus, and Prestige.
 - Dungeon Rank controls the player's maximum Sword Level until the next rank-up.
-- Dungeon worlds keep the player's normal Minecraft inventory. The Dungeon Menu,
-  Fragment Vault, and Hero Forge are optional dungeon tools.
+- Dungeon worlds keep the player's normal Minecraft inventory. The Hero Forge
+  is optional, and MythicMobs fragments remain physical inventory items.
+
+## Source organization
+
+The Java source is organized by ownership boundary:
+
+- `feature/sword`, `feature/forge`, `feature/rank`, `feature/party`, `feature/dungeoninventory`, and `feature/trainingdummy` contain gameplay features.
+- `integration/mythicmobs` and `integration/vault` contain external-plugin adapters.
+- `command` contains `/dh` routing and administrative command behavior.
+- `messaging` contains player-facing Adventure panels.
+- `DungeonHeroPlugin` is intentionally limited to dependency construction, listener registration, and scheduler setup.
+
+The `dungeonhero.admin` permission remains the full administrator permission and inherits the granular reload, give, and dummy cleanup permissions. Dummy cleanup only removes entities marked with DungeonHero's persistent data keys.
 
 ## Dungeon world tools
 
@@ -90,26 +104,20 @@ Configure the dungeon world names in
 DungeonHero:
   DungeonInventory:
     Enabled: true
+    FragmentVault:
+      Enabled: false
     Worlds:
       - dungeon_world
-    FragmentVaultSlots: 27
-    FragmentVaultStackSize: 64
 ```
 
 Players can bring, move, store, swap, and use any items normally in dungeon
 worlds. DungeonHero does not replace, lock, or snapshot their inventory.
 
-Use `/dh menu` to open the optional Dungeon Menu. It provides the Fragment Vault
-and Hero Forge. Fragments are stored as numeric balances
-per configured MythicMobs fragment type, but the vault deliberately behaves like
-a 27-slot inventory with 64 fragments per slot. This gives a clear, finite RPG
-capacity while still allowing automatic pickup. If the vault is full, the
-unstored remainder stays on the ground. `/dh vault` shows the stored counts.
-
-`/dh forge` consumes fragments directly from the Fragment Vault. The Forge now
-supports batch forging: use `-10`, `-1`, `+1`, `+10`, or `MAX`, then click the
-Forge button. The preview shows the total damage bonus and fragment cost before
-the batch is committed.
+Use `/dh menu` to open the optional Dungeon Menu. Fragments remain physical
+MythicMobs items in the player's normal inventory. `/dh forge` consumes physical
+fragments and supports batch forging: use `-10`, `-1`, `+1`, `+10`, or `MAX`, then
+click the Forge button. The preview shows the total damage bonus and fragment
+cost before the batch is committed.
 
 ## Five-player parties
 
@@ -172,17 +180,26 @@ DungeonHero finds nearby players within the configured radius when a MythicMob s
 DungeonHero:
   MobScaling:
     Enabled: true
+    Worlds:
+      - dungeon_world
     SearchRadius: 32
     PartyMode: AVERAGE
     MaxPlayers: 5
     BaseLevel: 1
     SwordLevelsPerMobLevel: 2
+    RankPowerBonus: 2.0
     DamageBonusWeight: 0.5
     PrestigeLevelBonus: 5
     MaxLevel: 100
 ```
 
 `PartyMode` can be `NEAREST`, `AVERAGE`, or `MAX`. With the default configuration, every 2 points of party combat power adds one MythicMob level. Combat power is Sword Level plus half of the sword's Damage Bonus plus 5 per Prestige. MythicMobs then applies the mob's own `LevelModifiers` for health, damage, armor, and other stats.
+
+When `MobScaling.Worlds` is configured, only MythicMobs spawning in those worlds
+is scaled. `RankPowerBonus` adds direct Dungeon Rank power using
+`(Dungeon Rank - 1) * RankPowerBonus`, so Rank affects mobs even before the sword
+reaches its new rank cap. The default setup enables scaling only in
+`dungeon_world` with a `RankPowerBonus` of 2.
 
 Prestige is available when the sword reaches `MaxSwordLevel`. It preserves fragment Damage Bonus, increases Prestige by one, and resets the sword to Level 1 and the Wood tier.
 

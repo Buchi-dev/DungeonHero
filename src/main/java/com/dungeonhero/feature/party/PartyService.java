@@ -1,5 +1,6 @@
-package com.dungeonhero;
+package com.dungeonhero.feature.party;
 
+import com.dungeonhero.feature.sword.HeroItemService;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;

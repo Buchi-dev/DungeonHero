@@ -1,4 +1,9 @@
-package com.dungeonhero;
+package com.dungeonhero.feature.forge;
+
+import com.dungeonhero.feature.dungeoninventory.DungeonInventoryService;
+import com.dungeonhero.feature.sword.HeroItemService;
+import com.dungeonhero.feature.sword.HeroSwordStorage;
+import com.dungeonhero.integration.mythicmobs.MythicFragmentService;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -56,7 +61,9 @@ public final class ForgeMenu implements InventoryHolder {
                             MythicFragmentService mythicFragmentService,
                             HeroSwordStorage heroSwordStorage,
                             DungeonInventoryService dungeonInventoryService) {
-        boolean dungeonForge = dungeonInventoryService != null && dungeonInventoryService.isDungeonWorld(player);
+        boolean dungeonForge = dungeonInventoryService != null
+                && dungeonInventoryService.isDungeonWorld(player)
+                && dungeonInventoryService.isFragmentVaultEnabled();
         ForgeMenu menu = new ForgeMenu(heroItemService, mythicFragmentService, heroSwordStorage,
                 dungeonInventoryService, dungeonForge);
         menu.forgePlayer = player;

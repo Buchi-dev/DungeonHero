@@ -1,4 +1,4 @@
-package com.dungeonhero;
+package com.dungeonhero.feature.sword;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;

@@ -1,4 +1,7 @@
-package com.dungeonhero;
+package com.dungeonhero.feature.rank;
+
+import com.dungeonhero.feature.sword.HeroItemService;
+import com.dungeonhero.integration.vault.VaultEconomyService;
 
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;

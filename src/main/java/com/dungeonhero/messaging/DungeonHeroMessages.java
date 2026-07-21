@@ -1,4 +1,10 @@
-package com.dungeonhero;
+package com.dungeonhero.messaging;
+
+import com.dungeonhero.feature.party.PartyService;
+import com.dungeonhero.feature.rank.DungeonRankService;
+import com.dungeonhero.feature.sword.HeroItemService;
+import com.dungeonhero.feature.sword.SwordProgressionService;
+import com.dungeonhero.feature.sword.SwordTier;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -114,7 +120,6 @@ public final class DungeonHeroMessages {
         sendPanel(sender, "DUNGEON HERO", NamedTextColor.GOLD, List.of(
                 command("/dh forge", "Open the Hero Forge"),
                 command("/dh menu", "Open the Dungeon Menu"),
-                command("/dh vault", "View stored fragments"),
                 command("/dh sword", "Show Hero Sword progression"),
                 command("/dh rank", "Show Dungeon Rank and balance"),
                 command("/dh rankup", "Spend Dungeon Coins to rank up"),

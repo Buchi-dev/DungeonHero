@@ -1,4 +1,9 @@
-package com.dungeonhero;
+package com.dungeonhero.feature.dungeoninventory;
+
+import com.dungeonhero.feature.sword.HeroItemService;
+import com.dungeonhero.feature.sword.HeroSwordStorage;
+import com.dungeonhero.feature.forge.ForgeMenu;
+import com.dungeonhero.integration.mythicmobs.MythicFragmentService;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -34,7 +39,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Provides dungeon-world access to the Fragment Vault and Hero Forge without
+ * Provides dungeon-world access to the Hero Forge without
  * changing, locking, or replacing the player's normal inventory.
  */
 public final class DungeonInventoryService implements Listener {
@@ -51,6 +56,7 @@ public final class DungeonInventoryService implements Listener {
     private YamlConfiguration data;
 
     private boolean enabled;
+    private boolean fragmentVaultEnabled;
     private int fragmentVaultSlots;
     private int fragmentVaultStackSize;
     private Set<String> dungeonWorlds = Set.of();
@@ -69,6 +75,8 @@ public final class DungeonInventoryService implements Listener {
 
     public void reload() {
         enabled = plugin.getConfig().getBoolean("DungeonHero.DungeonInventory.Enabled", true);
+        fragmentVaultEnabled = plugin.getConfig().getBoolean(
+                "DungeonHero.DungeonInventory.FragmentVault.Enabled", true);
         int configuredVaultSlots = plugin.getConfig().getInt(
                 "DungeonHero.DungeonInventory.FragmentVaultSlots", DEFAULT_FRAGMENT_VAULT_SLOTS);
         fragmentVaultSlots = Math.max(9, Math.min(DEFAULT_FRAGMENT_VAULT_SLOTS, (configuredVaultSlots / 9) * 9));
@@ -88,13 +96,17 @@ public final class DungeonInventoryService implements Listener {
                 && dungeonWorlds.contains(player.getWorld().getName().toLowerCase(Locale.ROOT));
     }
 
+    public boolean isFragmentVaultEnabled() {
+        return fragmentVaultEnabled;
+    }
+
     /**
      * Restores inventories left in the old fixed-loadout system and migrates
      * old physical fragment bags. It does not alter normal dungeon players.
      */
     public void syncOnlinePlayers() {
         for (Player player : Bukkit.getOnlinePlayers()) {
-            migrateLegacyFragments(player.getUniqueId());
+            migrateOrReleaseFragments(player);
             restoreLegacyInventorySnapshot(player);
         }
     }
@@ -102,7 +114,7 @@ public final class DungeonInventoryService implements Listener {
     @EventHandler(priority = EventPriority.LOWEST)
     public void onJoin(PlayerJoinEvent event) {
         Bukkit.getScheduler().runTask(plugin, () -> {
-            migrateLegacyFragments(event.getPlayer().getUniqueId());
+            migrateOrReleaseFragments(event.getPlayer());
             restoreLegacyInventorySnapshot(event.getPlayer());
         });
     }
@@ -114,7 +126,9 @@ public final class DungeonInventoryService implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPickup(EntityPickupItemEvent event) {
-        if (!(event.getEntity() instanceof Player player) || !isDungeonWorld(player)) {
+        if (!(event.getEntity() instanceof Player player)
+                || !isDungeonWorld(player)
+                || !fragmentVaultEnabled) {
             return;
         }
 
@@ -190,8 +204,13 @@ public final class DungeonInventoryService implements Listener {
 
         Inventory menu = Bukkit.createInventory(new DungeonMenuHolder(), 27,
                 Component.text("Dungeon Menu", NamedTextColor.GOLD));
-        menu.setItem(11, namedItem(Material.BOOK, "Fragment Vault", NamedTextColor.LIGHT_PURPLE,
-                "View fragments stored for your Hero Sword."));
+        if (fragmentVaultEnabled) {
+            menu.setItem(11, namedItem(Material.BOOK, "Fragment Vault", NamedTextColor.LIGHT_PURPLE,
+                    "View fragments stored for your Hero Sword."));
+        } else {
+            menu.setItem(11, namedItem(Material.BARRIER, "Fragment Vault Removed", NamedTextColor.DARK_GRAY,
+                    "Fragments now remain in your normal inventory."));
+        }
         menu.setItem(13, namedItem(Material.CHEST, "Free Inventory", NamedTextColor.GREEN,
                 "Your normal inventory is fully available in dungeons."));
         menu.setItem(15, namedItem(Material.ANVIL, "Hero Forge", NamedTextColor.DARK_PURPLE,
@@ -201,6 +220,11 @@ public final class DungeonInventoryService implements Listener {
     }
 
     public void openFragmentVault(Player player) {
+        if (!fragmentVaultEnabled) {
+            player.sendMessage(Component.text("The Fragment Vault has been removed. Fragments stay in your normal inventory.",
+                    NamedTextColor.YELLOW));
+            return;
+        }
         if (!requireDungeonWorld(player, "The Fragment Vault is only available inside a dungeon.")) {
             return;
         }
@@ -237,11 +261,17 @@ public final class DungeonInventoryService implements Listener {
     }
 
     public int getFragmentCount(Player player, String fragmentId) {
+        if (!fragmentVaultEnabled) {
+            return 0;
+        }
         migrateLegacyFragments(player.getUniqueId());
         return Math.max(0, data.getInt(fragmentVaultPath(player.getUniqueId(), fragmentId), 0));
     }
 
     public ItemStack getAvailableForgeFragment(Player player) {
+        if (!fragmentVaultEnabled) {
+            return null;
+        }
         migrateLegacyFragments(player.getUniqueId());
         for (String id : mythicFragmentService.getFragmentIds()) {
             if (getStoredFragmentCount(player.getUniqueId(), id) <= 0) {
@@ -257,7 +287,7 @@ public final class DungeonInventoryService implements Listener {
     }
 
     public boolean consumeForgeFragments(Player player, MythicFragmentService.FragmentUpgrade upgrade, int amount) {
-        if (upgrade == null) {
+        if (!fragmentVaultEnabled || upgrade == null) {
             return false;
         }
         migrateLegacyFragments(player.getUniqueId());
@@ -313,6 +343,44 @@ public final class DungeonInventoryService implements Listener {
         }
         migrateLegacyFragments(player.getUniqueId());
         return storeFragmentCount(player.getUniqueId(), inspection.upgrade().id(), Math.max(1, item.getAmount()));
+    }
+
+    private void migrateOrReleaseFragments(Player player) {
+        if (fragmentVaultEnabled) {
+            migrateLegacyFragments(player.getUniqueId());
+            return;
+        }
+        releaseDisabledVaultFragments(player);
+    }
+
+    private void releaseDisabledVaultFragments(Player player) {
+        String migratedPath = playerPath(player.getUniqueId()) + ".loadout.fragment_vault_disabled_migrated";
+        if (data.getBoolean(migratedPath, false)) {
+            return;
+        }
+
+        for (String id : mythicFragmentService.getFragmentIds()) {
+            String path = fragmentVaultPath(player.getUniqueId(), id);
+            int count = Math.max(0, data.getInt(path, 0));
+            if (count <= 0) {
+                continue;
+            }
+            ItemStack item = mythicFragmentService.createItem(id).orElse(null);
+            if (item == null || item.getType().isAir()) {
+                continue;
+            }
+            int remaining = count;
+            while (remaining > 0) {
+                ItemStack stack = item.clone();
+                int amount = Math.min(stack.getMaxStackSize(), remaining);
+                stack.setAmount(amount);
+                heroItemService.giveOrDrop(player, stack);
+                remaining -= amount;
+            }
+            data.set(path, null);
+        }
+        data.set(migratedPath, true);
+        saveData();
     }
 
     private int storeFragmentCount(UUID uuid, String fragmentId, int amount) {

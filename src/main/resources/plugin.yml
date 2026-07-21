@@ -9,9 +9,26 @@ depend: [MythicMobs, Vault]
 commands:
   dungeonhero:
     description: Shows DungeonHero status and opens the Hero Forge.
-    usage: /dungeonhero [help|reload|menu|vault|forge|give|sword|rank|rankup|party|prestige|dummy|version]
+    usage: /dungeonhero [help|reload|menu|forge|give|sword|rank|rankup|party|prestige|dummy|version]
     aliases: [dh]
 permissions:
   dungeonhero.admin:
     description: Allows administrative DungeonHero commands.
     default: op
+    children:
+      dungeonhero.admin.reload: true
+      dungeonhero.admin.give: true
+      dungeonhero.admin.dummy.remove: true
+      dungeonhero.admin.dummy.remove-all: true
+  dungeonhero.admin.reload:
+    description: Allows reloading DungeonHero configuration.
+    default: false
+  dungeonhero.admin.give:
+    description: Allows giving configured MythicMobs items.
+    default: false
+  dungeonhero.admin.dummy.remove:
+    description: Allows removing Training Dummies in the current world.
+    default: false
+  dungeonhero.admin.dummy.remove-all:
+    description: Allows removing all DungeonHero Training Dummies from loaded worlds.
+    default: false

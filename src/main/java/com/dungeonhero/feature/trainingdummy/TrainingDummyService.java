@@ -1,4 +1,7 @@
-package com.dungeonhero;
+package com.dungeonhero.feature.trainingdummy;
+
+import com.dungeonhero.feature.sword.HeroItemService;
+import com.dungeonhero.feature.sword.SwordTier;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -89,18 +92,21 @@ public final class TrainingDummyService implements Listener {
     }
 
     public void remove(Player player) {
-        int removed = 0;
-        for (Entity entity : new ArrayList<>(player.getWorld().getEntities())) {
-            if (isDummy(entity)) {
-                removeDisplay(entity);
-                entity.remove();
-                removed++;
-            }
-        }
+        int removed = removeInWorld(player.getWorld());
         hitWindows.clear();
         player.sendMessage(Component.text(
                 removed == 0 ? "No Training Dummy found in this world." : "Removed " + removed + " Training Dummy.",
                 removed == 0 ? NamedTextColor.YELLOW : NamedTextColor.GREEN));
+    }
+
+    /** Removes every DungeonHero-owned dummy from loaded worlds. */
+    public int removeAll() {
+        int removed = 0;
+        for (World world : Bukkit.getWorlds()) {
+            removed += removeInWorld(world);
+        }
+        hitWindows.clear();
+        return removed;
     }
 
     public void sendStats(Player player) {
@@ -192,6 +198,18 @@ public final class TrainingDummyService implements Listener {
     private boolean isDummy(Entity entity) {
         return entity instanceof LivingEntity living
                 && living.getPersistentDataContainer().has(dummyKey, PersistentDataType.BYTE);
+    }
+
+    private int removeInWorld(World world) {
+        int removed = 0;
+        for (Entity entity : new ArrayList<>(world.getEntities())) {
+            if (isDummy(entity)) {
+                removeDisplay(entity);
+                entity.remove();
+                removed++;
+            }
+        }
+        return removed;
     }
 
     private void setMaxHealth(LivingEntity dummy) {

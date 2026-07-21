@@ -1,0 +1,4 @@
+command:
+  no_permission: "You do not have permission to use that command."
+  reload_complete: "DungeonHero configuration reloaded. Use /mm reload for MythicMobs changes."
+  dummy_remove_all: "Removed {count} DungeonHero Training Dummy target(s) from loaded worlds."

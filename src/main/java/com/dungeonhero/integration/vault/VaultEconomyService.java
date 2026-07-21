@@ -1,4 +1,4 @@
-package com.dungeonhero;
+package com.dungeonhero.integration.vault;
 
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.entity.Player;

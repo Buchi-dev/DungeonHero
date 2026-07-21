@@ -1,4 +1,4 @@
-package com.dungeonhero;
+package com.dungeonhero.feature.sword;
 
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;

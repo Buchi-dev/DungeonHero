@@ -1,4 +1,4 @@
-package com.dungeonhero;
+package com.dungeonhero.feature.sword;
 
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Material;

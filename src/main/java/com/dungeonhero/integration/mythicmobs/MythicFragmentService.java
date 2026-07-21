@@ -1,4 +1,4 @@
-package com.dungeonhero;
+package com.dungeonhero.integration.mythicmobs;
 
 import io.lumine.mythic.api.items.ItemManager;
 import io.lumine.mythic.bukkit.MythicBukkit;

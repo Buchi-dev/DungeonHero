@@ -1,4 +1,5 @@
 DungeonHero:
+  Locale: en_us
   Fragments:
     "mm:HeroDamageFragment":
       Type: fragment
@@ -14,6 +15,8 @@ DungeonHero:
     MaxSwordLevel: 100
   DungeonInventory:
     Enabled: true
+    FragmentVault:
+      Enabled: false
     Worlds:
       - dungeon_world
     FragmentVaultSlots: 27
@@ -76,11 +79,14 @@ DungeonHero:
     UpdateTicks: 10
   MobScaling:
     Enabled: true
+    Worlds:
+      - dungeon_world
     SearchRadius: 32
     PartyMode: AVERAGE
     MaxPlayers: 5
     BaseLevel: 1
     SwordLevelsPerMobLevel: 2
+    RankPowerBonus: 2.0
     DamageBonusWeight: 0.5
     PrestigeLevelBonus: 5
     MaxLevel: 100
