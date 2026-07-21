@@ -1,7 +1,7 @@
 package com.dungeonhero.command;
 
 import com.dungeonhero.feature.coins.DungeonCoinService;
-import com.dungeonhero.feature.forge.ForgeMenu;
+import com.dungeonhero.feature.forge.ForgeGui;
 import com.dungeonhero.feature.party.PartyService;
 import com.dungeonhero.feature.rank.DungeonRankService;
 import com.dungeonhero.feature.sword.HeroItemService;
@@ -59,6 +59,7 @@ public final class DungeonHeroCommand implements TabExecutor {
     private final DungeonRankService dungeonRankService;
     private final PartyService partyService;
     private final TrainingDummyService trainingDummyService;
+    private final ForgeGui forgeGui;
     private final MessageService messageService;
     private final DungeonCoinService dungeonCoinService;
 
@@ -74,6 +75,7 @@ public final class DungeonHeroCommand implements TabExecutor {
                               DungeonRankService dungeonRankService,
                               PartyService partyService,
                               TrainingDummyService trainingDummyService,
+                              ForgeGui forgeGui,
                               MessageService messageService,
                               DungeonCoinService dungeonCoinService) {
         this.plugin = plugin;
@@ -88,6 +90,7 @@ public final class DungeonHeroCommand implements TabExecutor {
         this.dungeonRankService = dungeonRankService;
         this.partyService = partyService;
         this.trainingDummyService = trainingDummyService;
+        this.forgeGui = forgeGui;
         this.messageService = messageService;
         this.dungeonCoinService = dungeonCoinService;
     }
@@ -174,7 +177,7 @@ public final class DungeonHeroCommand implements TabExecutor {
                 sender.sendMessage(Component.text("Only players can use the Hero Forge.", NamedTextColor.RED));
                 return true;
             }
-            ForgeMenu.open(player, heroItemService, mythicFragmentService, heroSwordStorage);
+            forgeGui.open(player);
             return true;
         }
 

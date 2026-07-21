@@ -16,7 +16,7 @@ On Windows:
 .\gradlew.bat build
 ```
 
-The plugin JAR is generated at `build/libs/DungeonHero-1.6.2.jar`.
+The plugin JAR is generated at `build/libs/DungeonHero-1.6.4.jar`.
 
 Copy that JAR into the server's `plugins` directory and restart the server. Once loaded, `/dungeonhero` (or `/dh`) confirms that the plugin is active.
 
@@ -99,9 +99,11 @@ The `dungeonhero.admin` permission remains the full administrator permission and
 ## Inventory and forge
 
 DungeonHero uses the player's normal Minecraft inventory. It does not replace,
-lock, snapshot, or vault items. `/dh forge` consumes physical MythicMobs
-fragments placed in the forge and supports batch forging with `-10`, `-1`, `+1`,
-`+10`, or `MAX`.
+lock, snapshot, or vault items. `/dh forge` opens a protected custom Forge GUI. Place
+one Hero Sword in the left slot and a configured Damage Fragment in the right
+slot. Use the batch controls and click the Forge button; the center slot is a
+preview and cannot be removed directly. One fragment is consumed per forge
+operation, and closing the GUI safely returns both input items.
 
 ## Five-player parties
 

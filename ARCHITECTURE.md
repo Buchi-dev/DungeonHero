@@ -47,3 +47,4 @@ The complete training dummy feature is isolated under `feature/trainingdummy`, s
 3. Inject dependencies through constructors.
 4. Add new admin actions under `command` with a dedicated permission node.
 5. Do not use broad entity removal; always check DungeonHero persistent data keys.
+6. Keep forge transactions in `feature/forge`; GUI input and output slots must be explicitly protected and revalidated before consuming inputs.
