@@ -98,6 +98,8 @@ DungeonHero:
     SupplyHotbarSlots: [3, 4, 6, 7, 8]
     ReservedSlot: 9
     MaxUniqueSupplyItems: 5
+    FragmentVaultSlots: 27
+    FragmentVaultStackSize: 64
     LoseSuppliesOnDeath: false
 ```
 
@@ -111,9 +113,11 @@ inventory and loads this layout:
 
 Use `/dh menu` or right-click the Dungeon Menu item. The menu opens the Fragment
 Vault, Supply Loadout, and Hero Forge. Fragments are stored as numeric balances
-per configured MythicMobs fragment type, so they go directly into the vault and
-are not limited by Minecraft's item stack size. `/dh vault` shows the stored
-counts. `/dh loadout` opens the preparation GUI; the top five slots are the
+per configured MythicMobs fragment type, but the vault deliberately behaves like
+a 27-slot inventory with 64 fragments per slot. This gives a clear, finite RPG
+capacity while still allowing automatic pickup. If the vault is full, the
+unstored remainder stays on the ground. `/dh vault` shows the stored counts.
+`/dh loadout` opens the preparation GUI; the top five slots are the
 selected loadout, and the lower staging area contains allowed items from the
 player's stored normal inventory. Only configured supply materials are accepted,
 and the selected loadout is limited to five unique item types.
@@ -123,7 +127,10 @@ Ordinary item pickups are blocked so the five-item loadout cannot be bypassed.
 Leaving the world restores the player's normal inventory and saves the dungeon
 loadout for the next run. The Hero Sword is retained through death; set
 `LoseSuppliesOnDeath` to `true` if dungeon supplies should be cleared on death.
-`/dh forge` consumes one fragment directly from the Fragment Vault.
+`/dh forge` consumes fragments directly from the Fragment Vault. The Forge now
+supports batch forging: use `-10`, `-1`, `+1`, `+10`, or `MAX`, then click the
+Forge button. The preview shows the total damage bonus and fragment cost before
+the batch is committed.
 
 ## Five-player parties
 

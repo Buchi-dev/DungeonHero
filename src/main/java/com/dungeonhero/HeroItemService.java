@@ -173,11 +173,18 @@ public final class HeroItemService {
     }
 
     public ItemStack forge(ItemStack sword, MythicFragmentService.FragmentUpgrade upgrade) {
+        return forge(sword, upgrade, 1);
+    }
+
+    public ItemStack forge(ItemStack sword, MythicFragmentService.FragmentUpgrade upgrade, int quantity) {
         if (!isHeroSword(sword) || upgrade == null || !upgrade.isSupported()) {
             throw new IllegalArgumentException("The Hero Forge requires a valid Hero Sword and MythicMobs fragment.");
         }
+        if (quantity <= 0) {
+            throw new IllegalArgumentException("Forge quantity must be positive.");
+        }
 
-        double newDamageBonus = getDamageBonus(sword) + upgrade.amount();
+        double newDamageBonus = getDamageBonus(sword) + (upgrade.amount() * quantity);
         ItemStack upgradedSword = sword.clone();
         ItemMeta meta = upgradedSword.getItemMeta();
         meta.getPersistentDataContainer().set(damageBonusKey, PersistentDataType.DOUBLE, newDamageBonus);

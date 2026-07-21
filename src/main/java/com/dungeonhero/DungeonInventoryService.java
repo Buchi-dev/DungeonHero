@@ -52,6 +52,8 @@ import java.util.UUID;
 public final class DungeonInventoryService implements Listener {
 
     private static final int FRAGMENT_BAG_SIZE = 54;
+    private static final int DEFAULT_FRAGMENT_VAULT_SLOTS = 27;
+    private static final int DEFAULT_FRAGMENT_VAULT_STACK_SIZE = 64;
     private static final int SUPPLY_BAG_SIZE = 5;
     private static final int SUPPLY_MENU_SIZE = 54;
     private static final int[] DEFAULT_SUPPLY_HOTBAR_SLOTS = {2, 3, 5, 6, 7};
@@ -75,6 +77,8 @@ public final class DungeonInventoryService implements Listener {
     private int[] supplyHotbarSlots = DEFAULT_SUPPLY_HOTBAR_SLOTS.clone();
     private int maxUniqueSupplyItems;
     private int fragmentBagStackSize;
+    private int fragmentVaultSlots;
+    private int fragmentVaultStackSize;
     private Set<String> dungeonWorlds = Set.of();
     private Set<Material> allowedSupplyMaterials = Set.of();
 
@@ -104,6 +108,11 @@ public final class DungeonInventoryService implements Listener {
                 "DungeonHero.DungeonInventory.MaxUniqueSupplyItems", 5));
         fragmentBagStackSize = Math.max(1, plugin.getConfig().getInt(
                 "DungeonHero.DungeonInventory.FragmentBagStackSize", 64));
+        int configuredVaultSlots = plugin.getConfig().getInt(
+                "DungeonHero.DungeonInventory.FragmentVaultSlots", DEFAULT_FRAGMENT_VAULT_SLOTS);
+        fragmentVaultSlots = Math.max(9, Math.min(DEFAULT_FRAGMENT_VAULT_SLOTS, (configuredVaultSlots / 9) * 9));
+        fragmentVaultStackSize = Math.max(1, Math.min(64, plugin.getConfig().getInt(
+                "DungeonHero.DungeonInventory.FragmentVaultStackSize", DEFAULT_FRAGMENT_VAULT_STACK_SIZE)));
 
         List<String> worlds = plugin.getConfig().getStringList("DungeonHero.DungeonInventory.Worlds");
         dungeonWorlds = worlds.stream()
@@ -234,10 +243,23 @@ public final class DungeonInventoryService implements Listener {
             return;
         }
 
-        storeFragmentDrop(player, event.getItem().getItemStack());
+        ItemStack dropped = event.getItem().getItemStack();
+        int requested = Math.max(1, dropped.getAmount());
+        int stored = storeFragmentDrop(player, dropped);
         event.setCancelled(true);
-        event.getItem().remove();
-        player.sendActionBar(Component.text("Fragment added to your Fragment Vault.", NamedTextColor.GREEN));
+        if (stored > 0) {
+            if (stored >= requested) {
+                event.getItem().remove();
+            } else {
+                dropped.setAmount(requested - stored);
+                event.getItem().setItemStack(dropped);
+            }
+            player.sendActionBar(Component.text("Added " + stored + " fragment"
+                    + (stored == 1 ? "" : "s") + " to your Fragment Vault.", NamedTextColor.GREEN));
+        } else {
+            player.sendActionBar(Component.text("Your Fragment Vault is full ("
+                    + fragmentVaultSlots + " slots).", NamedTextColor.RED));
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -404,7 +426,8 @@ public final class DungeonInventoryService implements Listener {
             return;
         }
 
-        Inventory vault = Bukkit.createInventory(new BagHolder(BagType.VAULT, player.getUniqueId()), 54,
+        Inventory vault = Bukkit.createInventory(new BagHolder(BagType.VAULT, player.getUniqueId()),
+                fragmentVaultSlots,
                 Component.text("Fragment Vault", NamedTextColor.LIGHT_PURPLE));
         int slot = 0;
         for (String id : mythicFragmentService.getFragmentIds()) {
@@ -412,25 +435,45 @@ public final class DungeonInventoryService implements Listener {
             if (count <= 0 || slot >= vault.getSize()) {
                 continue;
             }
-            ItemStack icon = mythicFragmentService.createItem(id).orElseGet(
-                    () -> namedItem(Material.AMETHYST_SHARD, id, NamedTextColor.LIGHT_PURPLE));
-            icon.setAmount(Math.max(1, Math.min(64, count)));
-            ItemMeta meta = icon.getItemMeta();
-            List<Component> lore = meta.hasLore() && meta.lore() != null
-                    ? new ArrayList<>(meta.lore()) : new ArrayList<>();
-            lore.add(Component.text("Stored: " + count, NamedTextColor.GREEN)
-                    .decoration(TextDecoration.ITALIC, false));
-            lore.add(Component.text("Fragments are used directly by /dh forge.", NamedTextColor.GRAY)
-                    .decoration(TextDecoration.ITALIC, false));
-            meta.lore(lore);
-            icon.setItemMeta(meta);
-            vault.setItem(slot++, icon);
+            int remaining = count;
+            while (remaining > 0 && slot < vault.getSize()) {
+                ItemStack icon = mythicFragmentService.createItem(id).orElseGet(
+                        () -> namedItem(Material.AMETHYST_SHARD, id, NamedTextColor.LIGHT_PURPLE));
+                icon.setAmount(Math.min(fragmentVaultStackSize, remaining));
+                ItemMeta meta = icon.getItemMeta();
+                List<Component> lore = meta.hasLore() && meta.lore() != null
+                        ? new ArrayList<>(meta.lore()) : new ArrayList<>();
+                lore.add(Component.text("Stored total: " + count, NamedTextColor.GREEN)
+                        .decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Vault slots: " + fragmentVaultSlots
+                                + " | Stack size: " + fragmentVaultStackSize, NamedTextColor.GRAY)
+                        .decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Used directly by batch forging.", NamedTextColor.GRAY)
+                        .decoration(TextDecoration.ITALIC, false));
+                meta.lore(lore);
+                icon.setItemMeta(meta);
+                vault.setItem(slot++, icon);
+                remaining -= Math.min(fragmentVaultStackSize, remaining);
+            }
         }
         player.openInventory(vault);
     }
 
     public int getFragmentCount(Player player, String fragmentId) {
         return Math.max(0, data.getInt(fragmentVaultPath(player.getUniqueId(), fragmentId), 0));
+    }
+
+    public int getFragmentVaultSlots() {
+        return fragmentVaultSlots;
+    }
+
+    public int getFragmentVaultUsedSlots(Player player) {
+        int used = 0;
+        for (String id : mythicFragmentService.getFragmentIds()) {
+            int count = getFragmentCount(player, id);
+            used += count <= 0 ? 0 : (int) Math.ceil((double) count / fragmentVaultStackSize);
+        }
+        return used;
     }
 
     public ItemStack getAvailableForgeFragment(Player player) {
@@ -448,15 +491,20 @@ public final class DungeonInventoryService implements Listener {
     }
 
     public boolean consumeForgeFragment(Player player, MythicFragmentService.FragmentUpgrade upgrade) {
+        return consumeForgeFragments(player, upgrade, 1);
+    }
+
+    public boolean consumeForgeFragments(Player player, MythicFragmentService.FragmentUpgrade upgrade, int amount) {
         if (upgrade == null) {
             return false;
         }
+        int requested = Math.max(1, amount);
         String path = fragmentVaultPath(player.getUniqueId(), upgrade.id());
         int count = data.getInt(path, 0);
-        if (count <= 0) {
+        if (count < requested) {
             return false;
         }
-        data.set(path, count - 1);
+        data.set(path, count - requested);
         saveData();
         return true;
     }
@@ -731,20 +779,46 @@ public final class DungeonInventoryService implements Listener {
             if (!inspection.isValid()) {
                 continue;
             }
-            storeFragmentDrop(player, item);
-            inventory.setItem(slot, null);
+            int stored = storeFragmentDrop(player, item);
+            if (stored >= item.getAmount()) {
+                inventory.setItem(slot, null);
+            } else if (stored > 0) {
+                item.setAmount(item.getAmount() - stored);
+                inventory.setItem(slot, item);
+            }
         }
     }
 
-    private void storeFragmentDrop(Player player, ItemStack item) {
+    private int storeFragmentDrop(Player player, ItemStack item) {
         MythicFragmentService.Inspection inspection = mythicFragmentService.inspect(item);
         if (!inspection.isValid()) {
-            return;
+            return 0;
         }
-        String path = fragmentVaultPath(player.getUniqueId(), inspection.upgrade().id());
-        int current = data.getInt(path, 0);
-        data.set(path, current + Math.max(1, item.getAmount()));
-        saveData();
+        return storeFragmentCount(player.getUniqueId(), inspection.upgrade().id(), Math.max(1, item.getAmount()));
+    }
+
+    private int storeFragmentCount(UUID uuid, String fragmentId, int amount) {
+        String path = fragmentVaultPath(uuid, fragmentId);
+        int current = Math.max(0, data.getInt(path, 0));
+        int usedWithoutThis = getFragmentVaultUsedSlots(uuid)
+                - (current <= 0 ? 0 : (int) Math.ceil((double) current / fragmentVaultStackSize));
+        int availableSlots = Math.max(0, fragmentVaultSlots - usedWithoutThis);
+        int capacity = Math.max(0, availableSlots * fragmentVaultStackSize - current);
+        int stored = Math.min(Math.max(0, amount), capacity);
+        if (stored > 0) {
+            data.set(path, current + stored);
+            saveData();
+        }
+        return stored;
+    }
+
+    private int getFragmentVaultUsedSlots(UUID uuid) {
+        int used = 0;
+        for (String id : mythicFragmentService.getFragmentIds()) {
+            int count = Math.max(0, data.getInt(fragmentVaultPath(uuid, id), 0));
+            used += count <= 0 ? 0 : (int) Math.ceil((double) count / fragmentVaultStackSize);
+        }
+        return used;
     }
 
     private int addToFragmentBag(Player player, ItemStack item) {
@@ -966,8 +1040,12 @@ public final class DungeonInventoryService implements Listener {
                 if (!inspection.isValid()) {
                     continue;
                 }
-                String vaultPath = fragmentVaultPath(uuid, inspection.upgrade().id());
-                data.set(vaultPath, data.getInt(vaultPath, 0) + Math.max(1, fragment.getAmount()));
+                int migrated = storeFragmentCount(uuid, inspection.upgrade().id(),
+                        Math.max(1, fragment.getAmount()));
+                if (migrated < Math.max(1, fragment.getAmount())) {
+                    plugin.getLogger().warning("Fragment Vault capacity reached while migrating " + uuid
+                            + ". Some legacy fragments were not migrated.");
+                }
             }
             data.set(path + ".fragment_vault_migrated", true);
             data.set(path + ".fragments", null);
