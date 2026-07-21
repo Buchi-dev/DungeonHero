@@ -113,11 +113,15 @@ public final class DungeonHeroMessages {
     public static void sendHelp(CommandSender sender) {
         sendPanel(sender, "DUNGEON HERO", NamedTextColor.GOLD, List.of(
                 command("/dh forge", "Open the Hero Forge"),
+                command("/dh menu", "Open the Dungeon Menu"),
+                command("/dh loadout", "Manage dungeon supplies"),
+                command("/dh vault", "View stored fragments"),
                 command("/dh sword", "Show Hero Sword progression"),
                 command("/dh rank", "Show Dungeon Rank and balance"),
                 command("/dh rankup", "Spend Dungeon Coins to rank up"),
                 command("/dh party", "Play together with up to 5 heroes"),
                 command("/dh prestige", "Prestige a max-level sword"),
+                command("/dh dummy", "Test sword damage on a Training Dummy"),
                 command("/dh version", "Show the plugin version"),
                 command("/dh reload", "Reload configuration (admin)"),
                 command("/dh give", "Give a MythicMobs item (admin)")

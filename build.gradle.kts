@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "com.dungeonhero"
-version = "0.1.6"
+version = "1.6.2"
 
 repositories {
     maven {

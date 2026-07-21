@@ -53,6 +53,10 @@ public final class HeroItemService {
         return sword;
     }
 
+    public ItemStack createHeroSwordFromState(int level, int xp, double damageBonus, int prestige) {
+        return withSwordState(createHeroSword(), level, xp, damageBonus, prestige);
+    }
+
     public boolean isHeroSword(ItemStack item) {
         if (item == null || !item.hasItemMeta()) {
             return false;
@@ -113,16 +117,28 @@ public final class HeroItemService {
             return sword;
         }
 
+        return withSwordState(sword, level, xp, getDamageBonus(sword), getSwordPrestige(sword));
+    }
+
+    private ItemStack withSwordState(ItemStack sword, int level, int xp, double damageBonus, int prestige) {
+        if (!isHeroSword(sword)) {
+            return sword;
+        }
+
         ItemStack updatedSword = sword.clone();
         ItemMeta meta = updatedSword.getItemMeta();
         PersistentDataContainer data = meta.getPersistentDataContainer();
         int safeLevel = Math.max(1, level);
+        double safeDamageBonus = Math.max(0.0D, damageBonus);
+        int safePrestige = Math.max(0, prestige);
         SwordTier tier = SwordTier.fromLevel(safeLevel);
         data.set(swordLevelKey, PersistentDataType.INTEGER, safeLevel);
         data.set(swordXpKey, PersistentDataType.INTEGER, Math.max(0, xp));
         data.set(swordTierKey, PersistentDataType.STRING, tier.name());
+        data.set(damageBonusKey, PersistentDataType.DOUBLE, safeDamageBonus);
+        data.set(prestigeKey, PersistentDataType.INTEGER, safePrestige);
         updatedSword.setType(tier.material());
-        updateHeroSwordMeta(meta, getDamageBonus(updatedSword), tier, getSwordPrestige(updatedSword));
+        updateHeroSwordMeta(meta, safeDamageBonus, tier, safePrestige);
         updatedSword.setItemMeta(meta);
         return updatedSword;
     }
@@ -132,18 +148,8 @@ public final class HeroItemService {
             return sword;
         }
 
-        ItemStack updatedSword = sword.clone();
-        ItemMeta meta = updatedSword.getItemMeta();
-        PersistentDataContainer data = meta.getPersistentDataContainer();
         int prestige = getSwordPrestige(sword) + 1;
-        data.set(swordLevelKey, PersistentDataType.INTEGER, 1);
-        data.set(swordXpKey, PersistentDataType.INTEGER, 0);
-        data.set(swordTierKey, PersistentDataType.STRING, SwordTier.WOOD.name());
-        data.set(prestigeKey, PersistentDataType.INTEGER, prestige);
-        updatedSword.setType(SwordTier.WOOD.material());
-        updateHeroSwordMeta(meta, getDamageBonus(updatedSword), SwordTier.WOOD, prestige);
-        updatedSword.setItemMeta(meta);
-        return updatedSword;
+        return withSwordState(sword, 1, 0, getDamageBonus(sword), prestige);
     }
 
     public ItemStack normalizeSword(ItemStack sword) {

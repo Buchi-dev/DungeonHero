@@ -6,10 +6,38 @@ DungeonHero:
       Amount: 2
   Progression:
     SwordXPItem: "mm:HeroSwordXP"
+    AutoMobKillXP: true
     XPPerItem: 25
+    XPPerMobKill: 25
     BaseXPRequired: 100
     XPRequiredMultiplier: 1.25
     MaxSwordLevel: 100
+  DungeonInventory:
+    Enabled: true
+    Worlds:
+      - dungeon_world
+    HeroSwordSlot: 5
+    FragmentBagSlot: 1
+    SupplyBagSlot: 2
+    SupplyHotbarSlots: [3, 4, 6, 7, 8]
+    ReservedSlot: 9
+    MaxUniqueSupplyItems: 5
+    LoseSuppliesOnDeath: false
+    AllowedSupplyItems:
+      - BREAD
+      - COOKED_BEEF
+      - COOKED_CHICKEN
+      - COOKED_PORKCHOP
+      - COOKED_MUTTON
+      - COOKED_RABBIT
+      - COOKED_COD
+      - COOKED_SALMON
+      - GOLDEN_APPLE
+      - POTION
+      - SPLASH_POTION
+      - LINGERING_POTION
+      - FIREWORK_ROCKET
+      - ELYTRA
   Ranks:
     CoinName: "Dungeon Coins"
     List:
@@ -81,3 +109,12 @@ DungeonHero:
     MaxSize: 5
     RequireSameWorld: true
     InvitationSeconds: 60
+  TargetDummy:
+    Enabled: true
+    Health: 1000
+    SearchRadius: 48
+    SpawnDistance: 3
+    DamageWindowSeconds: 5
+    Hologram:
+      Enabled: true
+      Height: 2.6

@@ -14,47 +14,66 @@ import java.util.List;
 public final class DungeonHeroPlugin extends JavaPlugin implements TabExecutor {
 
     private static final List<String> SUBCOMMANDS = List.of(
-            "help", "reload", "forge", "give", "sword", "rank", "rankup", "party", "prestige", "version"
+            "help", "reload", "menu", "loadout", "vault", "forge", "give", "sword", "rank", "rankup", "party", "prestige", "dummy", "version"
     );
     private static final List<String> PARTY_SUBCOMMANDS = List.of(
             "create", "invite", "accept", "info", "leave", "kick", "disband", "help"
     );
 
     private HeroItemService heroItemService;
+    private HeroSwordStorage heroSwordStorage;
+    private HeroPlayerListener heroPlayerListener;
+    private DungeonInventoryService dungeonInventoryService;
     private MythicFragmentService mythicFragmentService;
     private HeroSwordMobScaler heroSwordMobScaler;
     private SwordProgressionService swordProgressionService;
     private SwordHudService swordHudService;
     private DungeonRankService dungeonRankService;
     private PartyService partyService;
+    private TrainingDummyService trainingDummyService;
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
         heroItemService = new HeroItemService(this);
+        heroSwordStorage = new HeroSwordStorage(this, heroItemService);
         mythicFragmentService = new MythicFragmentService(this);
+        dungeonInventoryService = new DungeonInventoryService(this, heroItemService,
+                heroSwordStorage, mythicFragmentService);
         dungeonRankService = new DungeonRankService(this, heroItemService);
         partyService = new PartyService(this);
+        trainingDummyService = new TrainingDummyService(this, heroItemService);
         swordProgressionService = new SwordProgressionService(this, heroItemService, mythicFragmentService,
-                dungeonRankService);
+                dungeonRankService, heroSwordStorage);
         heroSwordMobScaler = new HeroSwordMobScaler(this, heroItemService, partyService);
         swordHudService = new SwordHudService(this, heroItemService, swordProgressionService);
-        getServer().getPluginManager().registerEvents(new HeroPlayerListener(this, heroItemService), this);
+        heroPlayerListener = new HeroPlayerListener(this, heroItemService, heroSwordStorage);
+        getServer().getPluginManager().registerEvents(heroPlayerListener, this);
+        getServer().getPluginManager().registerEvents(dungeonInventoryService, this);
         getServer().getPluginManager().registerEvents(
                 new ForgeMenu.Listener(this), this);
         getServer().getPluginManager().registerEvents(swordProgressionService, this);
         getServer().getPluginManager().registerEvents(heroSwordMobScaler, this);
         getServer().getPluginManager().registerEvents(swordHudService, this);
         getServer().getPluginManager().registerEvents(partyService, this);
+        getServer().getPluginManager().registerEvents(trainingDummyService, this);
         long hudUpdateTicks = Math.max(1, getConfig().getLong("DungeonHero.Hud.UpdateTicks", 10));
         getServer().getScheduler().runTaskTimer(this, swordHudService::syncOnlinePlayers,
                 hudUpdateTicks, hudUpdateTicks);
+        getServer().getScheduler().runTask(this, dungeonInventoryService::syncOnlinePlayers);
         if (getCommand("dungeonhero") != null) {
             getCommand("dungeonhero").setExecutor(this);
             getCommand("dungeonhero").setTabCompleter(this);
         }
 
-        getLogger().info("DungeonHero enabled. Dungeon systems are ready to be built.");
+        getLogger().info("DungeonHero enabled. Hero Sword, Forge, party, rank, and MythicMobs systems are ready.");
+    }
+
+    @Override
+    public void onDisable() {
+        if (dungeonInventoryService != null) {
+            dungeonInventoryService.saveOnlineDungeonPlayers();
+        }
     }
 
     @Override
@@ -79,6 +98,9 @@ public final class DungeonHeroPlugin extends JavaPlugin implements TabExecutor {
             swordProgressionService.reload();
             heroSwordMobScaler.reload();
             swordHudService.reload();
+            trainingDummyService.reload();
+            dungeonInventoryService.reload();
+            dungeonInventoryService.syncOnlinePlayers();
             sender.sendMessage(Component.text("DungeonHero configuration reloaded. Use /mm reload for MythicMobs changes.",
                     NamedTextColor.GREEN));
             return true;
@@ -89,13 +111,40 @@ public final class DungeonHeroPlugin extends JavaPlugin implements TabExecutor {
             return true;
         }
 
+        if (args[0].equalsIgnoreCase("menu")) {
+            if (sender instanceof Player player) {
+                dungeonInventoryService.openMenu(player);
+            } else {
+                sender.sendMessage(Component.text("Only players can open the Dungeon Menu.", NamedTextColor.RED));
+            }
+            return true;
+        }
+
+        if (args[0].equalsIgnoreCase("loadout")) {
+            if (sender instanceof Player player) {
+                dungeonInventoryService.openLoadout(player);
+            } else {
+                sender.sendMessage(Component.text("Only players can open the Supply Loadout.", NamedTextColor.RED));
+            }
+            return true;
+        }
+
+        if (args[0].equalsIgnoreCase("vault")) {
+            if (sender instanceof Player player) {
+                dungeonInventoryService.openFragmentVault(player);
+            } else {
+                sender.sendMessage(Component.text("Only players can open the Fragment Vault.", NamedTextColor.RED));
+            }
+            return true;
+        }
+
         if (args[0].equalsIgnoreCase("sword")) {
             if (!(sender instanceof Player player)) {
                 sender.sendMessage(Component.text("Only players can view Sword XP.", NamedTextColor.RED));
                 return true;
             }
             DungeonHeroMessages.sendSwordStatus(sender, player,
-                    heroItemService.findStrongestHeroSword(player), heroItemService, swordProgressionService);
+                    heroPlayerListener.restoreSavedSword(player), heroItemService, swordProgressionService);
             return true;
         }
 
@@ -132,7 +181,13 @@ public final class DungeonHeroPlugin extends JavaPlugin implements TabExecutor {
                 sender.sendMessage(Component.text("Only players can use the Hero Forge.", NamedTextColor.RED));
                 return true;
             }
-            ForgeMenu.open(player, heroItemService, mythicFragmentService);
+            ForgeMenu.open(player, heroItemService, mythicFragmentService, heroSwordStorage,
+                    dungeonInventoryService);
+            return true;
+        }
+
+        if (args[0].equalsIgnoreCase("dummy")) {
+            handleDummy(sender, args);
             return true;
         }
 
@@ -179,6 +234,26 @@ public final class DungeonHeroPlugin extends JavaPlugin implements TabExecutor {
         sender.sendMessage(Component.text("Gave " + args[2] + " to " + target.getName() + ".", NamedTextColor.GREEN));
     }
 
+    private void handleDummy(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(Component.text("Only players can use Training Dummies.", NamedTextColor.RED));
+            return;
+        }
+
+        String action = args.length >= 2 ? args[1].toLowerCase(java.util.Locale.ROOT) : "spawn";
+        switch (action) {
+            case "spawn", "open" -> trainingDummyService.open(player);
+            case "stats" -> trainingDummyService.sendStats(player);
+            case "remove" -> {
+                if (requireAdmin(sender)) {
+                    trainingDummyService.remove(player);
+                }
+            }
+            default -> player.sendMessage(Component.text(
+                    "Usage: /dh dummy [spawn|stats|remove]", NamedTextColor.YELLOW));
+        }
+    }
+
     private void prestige(CommandSender sender) {
         if (!(sender instanceof Player player)) {
             sender.sendMessage(Component.text("Only players can prestige a Hero Sword.", NamedTextColor.RED));
@@ -201,6 +276,7 @@ public final class DungeonHeroPlugin extends JavaPlugin implements TabExecutor {
 
         var prestigedSword = heroItemService.withPrestige(sword);
         player.getInventory().setItem(swordSlot, prestigedSword);
+        heroSwordStorage.save(player, prestigedSword);
         player.sendMessage(Component.text(
                 "Your Hero Sword is now Prestige " + heroItemService.getSwordPrestige(prestigedSword)
                         + " and has reset to Level 1 (Wood tier).",
@@ -289,6 +365,10 @@ public final class DungeonHeroPlugin extends JavaPlugin implements TabExecutor {
 
         if (args.length == 2 && args[0].equalsIgnoreCase("party")) {
             return complete(args[1], PARTY_SUBCOMMANDS);
+        }
+
+        if (args.length == 2 && args[0].equalsIgnoreCase("dummy")) {
+            return complete(args[1], List.of("spawn", "stats", "remove"));
         }
 
         if (args.length == 2 && args[0].equalsIgnoreCase("give") && sender.hasPermission("dungeonhero.admin")) {

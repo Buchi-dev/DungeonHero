@@ -6,6 +6,8 @@ Starting point for a dungeon adventure plugin built for Paper 26.1.2.
 
 - Java 25
 - Paper 26.1.2 (API build 72)
+- MythicMobs 5.12.1
+- Vault with an economy provider
 
 ## Build
 
@@ -15,9 +17,41 @@ On Windows:
 .\gradlew.bat build
 ```
 
-The plugin JAR is generated at `build/libs/DungeonHero-0.1.6.jar`.
+The plugin JAR is generated at `build/libs/DungeonHero-1.6.2.jar`.
 
 Copy that JAR into the server's `plugins` directory and restart the server. Once loaded, `/dungeonhero` (or `/dh`) confirms that the plugin is active.
+
+## Install the Crypt of the Fallen content pack
+
+The repository includes a ready-to-install `Dungeon_world` content pack. It
+adds Hero Sword XP and Damage Fragment items, four Crypt encounters, drop
+tables, and the boss skills used by the `dungeon_world` run. Build first, then
+run this from the project root:
+
+```powershell
+.\gradlew.bat build
+.\tools\Install-DungeonHero.ps1
+```
+
+The installer targets `D:\Minecraft FIles (Server)\New` by default, verifies
+Vault, installs MythicMobs 5.12.1 from the supplied parent folder when it is
+not already present, and copies only DungeonHero-owned MythicMobs files. It
+does not overwrite DungeonCore content. Restart the server and run `/mm reload`
+after installation.
+
+### Dungeon_world gameplay loop
+
+Cryptlings and Bone Archers are the normal wave, Soul Reavers are the elite
+encounter, and the Crypt Lord is the boss. Player-killed mobs automatically
+grant Sword XP to the killer's strongest Hero Sword. `HeroDamageFragment` is the forge
+material and adds +2 damage per infusion. The boss enters a soul phase below
+55% health and summons reinforcements.
+
+DungeonCore should remain the authoritative world spawner and reward owner.
+Use the MythicMobs spawn command above for a smoke test, or register the `DW_HERO_`
+IDs in a DungeonCore pool if your DungeonCore build supports Mythic provider
+entries. This keeps DungeonCore rewards and DungeonHero progression from being
+paid twice.
 
 ## Current features
 
@@ -36,12 +70,60 @@ Copy that JAR into the server's `plugins` directory and restart the server. Once
 - Hero Sword lore is grouped into progression, power, and forge sections.
 - The vanilla Minecraft XP level number and XP bar display the Hero Sword level and XP.
 - `/dh version` shows the installed plugin version.
+- `/dh dummy` creates or locates a Training Dummy and displays hit damage, total damage, and short-window DPS.
 - MythicMobs custom items can be configured as fragments and dropped by MythicMobs mobs.
-- MythicMobs can drop a configured Hero Sword XP item that is automatically converted into sword XP when picked up.
+- Player-killed mobs automatically grant Sword XP to the strongest Hero Sword, with no XP item required.
+- The legacy Hero Sword XP pickup flow remains available when automatic mob XP is disabled.
 - Forging a Damage fragment updates the sword's actual main-hand attack damage.
 - Hero Sword tiers progress from Wood to Hero as the sword levels.
 - MythicMob levels can scale from nearby players' Sword Level, fragment Damage Bonus, and Prestige.
 - Dungeon Rank controls the player's maximum Sword Level until the next rank-up.
+- Dungeon worlds use a separate RPG loadout with a fixed Hero Sword, Dungeon Menu,
+  Fragment Vault, and five-unique-item Supply Loadout.
+
+## Dungeon loadout inventory
+
+Version 1.6.2 adds a dungeon-only inventory profile. Configure the world names in
+`plugins/DungeonHero/config.yml`:
+
+```yaml
+DungeonHero:
+  DungeonInventory:
+    Enabled: true
+    Worlds:
+      - dungeon_world
+    HeroSwordSlot: 5
+    FragmentBagSlot: 1
+    SupplyBagSlot: 2
+    SupplyHotbarSlots: [3, 4, 6, 7, 8]
+    ReservedSlot: 9
+    MaxUniqueSupplyItems: 5
+    LoseSuppliesOnDeath: false
+```
+
+When a player enters a configured dungeon world, DungeonHero stores their normal
+inventory and loads this layout:
+
+```text
+[Dungeon Menu] [Reserved] [Item 1] [Item 2] [HERO SWORD] [Item 3] [Item 4] [Item 5] [Reserved]
+      1              2        3        4          5           6        7        8         9
+```
+
+Use `/dh menu` or right-click the Dungeon Menu item. The menu opens the Fragment
+Vault, Supply Loadout, and Hero Forge. Fragments are stored as numeric balances
+per configured MythicMobs fragment type, so they go directly into the vault and
+are not limited by Minecraft's item stack size. `/dh vault` shows the stored
+counts. `/dh loadout` opens the preparation GUI; the top five slots are the
+selected loadout, and the lower staging area contains allowed items from the
+player's stored normal inventory. Only configured supply materials are accepted,
+and the selected loadout is limited to five unique item types.
+
+The Hero Sword and Dungeon Menu cannot be moved or dropped in the dungeon.
+Ordinary item pickups are blocked so the five-item loadout cannot be bypassed.
+Leaving the world restores the player's normal inventory and saves the dungeon
+loadout for the next run. The Hero Sword is retained through death; set
+`LoseSuppliesOnDeath` to `true` if dungeon supplies should be cleared on death.
+`/dh forge` consumes one fragment directly from the Fragment Vault.
 
 ## Five-player parties
 
@@ -120,19 +202,21 @@ Prestige is available when the sword reaches `MaxSwordLevel`. It preserves fragm
 
 ## Sword XP
 
-Configure a MythicMobs custom item with the ID `HeroSwordXP`, then make MythicMobs mobs drop it. DungeonHero consumes that item when the player picks it up and awards XP to the player's Hero Sword.
+By default, player-killed mobs automatically grant Sword XP to the killer's strongest Hero Sword. No physical XP item is created or required. The legacy `HeroSwordXP` pickup flow can still be used by disabling automatic mob XP.
 
 ```yaml
 DungeonHero:
   Progression:
     SwordXPItem: "mm:HeroSwordXP"
+    AutoMobKillXP: true
     XPPerItem: 25
+    XPPerMobKill: 25
     BaseXPRequired: 100
     XPRequiredMultiplier: 1.25
     MaxSwordLevel: 100
 ```
 
-The sword stores its level and XP as persistent item data. XP requirements increase each level, and XP collection stops at the configured maximum level.
+The sword stores its level and XP as persistent item data. XP requirements increase each level, and XP collection stops at the configured maximum level. `XPPerMobKill` controls the automatic reward; `XPPerItem` controls the legacy pickup reward.
 
 ## Sword XP HUD
 

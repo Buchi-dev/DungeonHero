@@ -6,7 +6,9 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
+import org.bukkit.entity.Mob;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -17,34 +19,84 @@ public final class SwordProgressionService implements Listener {
     private final HeroItemService heroItemService;
     private final MythicFragmentService mythicFragmentService;
     private final DungeonRankService dungeonRankService;
+    private final HeroSwordStorage heroSwordStorage;
 
     private String swordXpItemId;
+    private boolean autoMobKillXp;
     private int xpPerItem;
+    private int xpPerMobKill;
     private int baseXpRequired;
     private double xpRequiredMultiplier;
     private int maxSwordLevel;
 
     public SwordProgressionService(JavaPlugin plugin, HeroItemService heroItemService,
                                    MythicFragmentService mythicFragmentService,
-                                   DungeonRankService dungeonRankService) {
+                                   DungeonRankService dungeonRankService,
+                                   HeroSwordStorage heroSwordStorage) {
         this.plugin = plugin;
         this.heroItemService = heroItemService;
         this.mythicFragmentService = mythicFragmentService;
         this.dungeonRankService = dungeonRankService;
+        this.heroSwordStorage = heroSwordStorage;
         reload();
     }
 
     public void reload() {
         swordXpItemId = plugin.getConfig().getString(
                 "DungeonHero.Progression.SwordXPItem", "mm:HeroSwordXP");
+        autoMobKillXp = plugin.getConfig().getBoolean(
+                "DungeonHero.Progression.AutoMobKillXP", true);
         xpPerItem = Math.max(1, plugin.getConfig().getInt(
                 "DungeonHero.Progression.XPPerItem", 25));
+        xpPerMobKill = Math.max(1, plugin.getConfig().getInt(
+                "DungeonHero.Progression.XPPerMobKill", xpPerItem));
         baseXpRequired = Math.max(1, plugin.getConfig().getInt(
                 "DungeonHero.Progression.BaseXPRequired", 100));
         xpRequiredMultiplier = Math.max(1.0, plugin.getConfig().getDouble(
                 "DungeonHero.Progression.XPRequiredMultiplier", 1.25));
         maxSwordLevel = Math.max(1, plugin.getConfig().getInt(
                 "DungeonHero.Progression.MaxSwordLevel", 100));
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onMobDeath(EntityDeathEvent event) {
+        if (!autoMobKillXp || !(event.getEntity() instanceof Mob mob)) {
+            return;
+        }
+
+        Player player = mob.getKiller();
+        if (player == null) {
+            return;
+        }
+
+        // Automatic mode replaces the physical HeroSwordXP drop.
+        removeSwordXpDrops(event);
+
+        PlayerInventory inventory = player.getInventory();
+        int swordSlot = findStrongestSwordSlot(inventory);
+        if (swordSlot < 0) {
+            player.sendActionBar(Component.text("You need your Hero Sword to receive Sword XP.",
+                    NamedTextColor.RED));
+            return;
+        }
+
+        ItemStack sword = inventory.getItem(swordSlot);
+        int playerLevelCap = getMaxSwordLevel(player);
+        if (heroItemService.getSwordLevel(sword) >= playerLevelCap) {
+            player.sendActionBar(Component.text("Your Hero Sword has reached the level cap.",
+                    NamedTextColor.YELLOW));
+            return;
+        }
+
+        ProgressionResult result = addExperience(sword, xpPerMobKill, playerLevelCap);
+        inventory.setItem(swordSlot, result.sword());
+        heroSwordStorage.save(player, result.sword());
+        if (result.levelsGained() > 0) {
+            player.sendMessage(Component.text("Your Hero Sword reached Level " + result.level() + "!",
+                    NamedTextColor.GREEN));
+        }
+        player.sendActionBar(DungeonHeroMessages.compactSwordActionBar(result.sword(), heroItemService, this,
+                playerLevelCap));
     }
 
     @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
@@ -72,6 +124,7 @@ public final class SwordProgressionService implements Listener {
         int xpAmount = event.getItem().getItemStack().getAmount() * xpPerItem;
         ProgressionResult result = addExperience(sword, xpAmount, playerLevelCap);
         inventory.setItem(swordSlot, result.sword());
+        heroSwordStorage.save(player, result.sword());
         event.setCancelled(true);
         event.getItem().remove();
 
@@ -182,6 +235,10 @@ public final class SwordProgressionService implements Listener {
             }
         }
         return strongestSlot;
+    }
+
+    private void removeSwordXpDrops(EntityDeathEvent event) {
+        event.getDrops().removeIf(item -> mythicFragmentService.isItemId(item, swordXpItemId));
     }
 
     private boolean isStronger(ItemStack first, ItemStack second) {

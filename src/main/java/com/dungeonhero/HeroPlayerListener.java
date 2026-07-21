@@ -20,16 +20,28 @@ public final class HeroPlayerListener implements Listener {
 
     private final JavaPlugin plugin;
     private final HeroItemService heroItemService;
+    private final HeroSwordStorage heroSwordStorage;
     private final Map<UUID, ItemStack> swordsToRestore = new HashMap<>();
 
-    public HeroPlayerListener(JavaPlugin plugin, HeroItemService heroItemService) {
+    public HeroPlayerListener(JavaPlugin plugin, HeroItemService heroItemService, HeroSwordStorage heroSwordStorage) {
         this.plugin = plugin;
         this.heroItemService = heroItemService;
+        this.heroSwordStorage = heroSwordStorage;
     }
 
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
-        ensureHeroSword(event.getPlayer(), null);
+        Player player = event.getPlayer();
+        ensureHeroSword(player, heroSwordStorage.load(player));
+    }
+
+    @EventHandler
+    public void onQuit(org.bukkit.event.player.PlayerQuitEvent event) {
+        Player player = event.getPlayer();
+        ItemStack sword = heroItemService.findStrongestHeroSword(player);
+        if (heroItemService.isHeroSword(sword)) {
+            heroSwordStorage.save(player, sword);
+        }
     }
 
     @EventHandler
@@ -57,6 +69,7 @@ public final class HeroPlayerListener implements Listener {
         }
 
         if (bestSword != null) {
+            heroSwordStorage.save(event.getEntity(), bestSword);
             swordsToRestore.put(event.getEntity().getUniqueId(), bestSword);
         }
     }
@@ -93,6 +106,12 @@ public final class HeroPlayerListener implements Listener {
 
         Map<Integer, ItemStack> leftovers = inventory.addItem(bestSword);
         leftovers.values().forEach(item -> player.getWorld().dropItemNaturally(player.getLocation(), item));
+        heroSwordStorage.save(player, bestSword);
+    }
+
+    public ItemStack restoreSavedSword(Player player) {
+        ensureHeroSword(player, heroSwordStorage.load(player));
+        return heroItemService.findStrongestHeroSword(player);
     }
 
     private boolean isStronger(ItemStack first, ItemStack second) {
