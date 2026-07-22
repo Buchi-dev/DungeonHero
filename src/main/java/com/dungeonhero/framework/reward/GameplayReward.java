@@ -4,7 +4,7 @@ import com.dungeonhero.framework.GameplayDefinition;
 import com.dungeonhero.framework.context.GameplayContext;
 
 public interface GameplayReward {
-    String type();
+  String type();
 
-    RewardResult grant(GameplayContext context, GameplayDefinition definition);
+  RewardResult grant(GameplayContext context, GameplayDefinition definition);
 }

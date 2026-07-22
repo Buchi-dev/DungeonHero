@@ -4,7 +4,7 @@ import com.dungeonhero.framework.GameplayDefinition;
 import com.dungeonhero.framework.context.GameplayContext;
 
 public interface GameplayObjective {
-    String type();
+  String type();
 
-    ObjectiveResult evaluate(GameplayContext context, GameplayDefinition definition);
+  ObjectiveResult evaluate(GameplayContext context, GameplayDefinition definition);
 }

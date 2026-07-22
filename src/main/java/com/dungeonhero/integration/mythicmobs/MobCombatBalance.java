@@ -1,185 +1,142 @@
 package com.dungeonhero.integration.mythicmobs;
 
-import java.util.concurrent.ThreadLocalRandom;
-
 /** Pure, configuration-driven combat math shared by the MythicMobs adapter and tests. */
+/**
+ * @deprecated Use {@link MobScalingPolicy}. This adapter preserves the original MythicMobs
+ *     integration-facing types while keeping the calculations in the domain policy.
+ */
+@Deprecated(forRemoval = false)
 public final class MobCombatBalance {
 
-    private final int maxMobLevel;
-    private final int normalMinOffset;
-    private final int normalMaxOffset;
-    private final int eliteMinOffset;
-    private final int eliteMaxOffset;
-    private final int minibossMinOffset;
-    private final int minibossMaxOffset;
-    private final int rareBossMinOffset;
-    private final int rareBossMaxOffset;
-    private final double normalBaseHp;
-    private final double normalHpPerLevel;
-    private final double normalMultiplier;
-    private final double eliteMultiplier;
-    private final double minibossMultiplier;
-    private final double rareBossMultiplier;
-    private final double normalAttackFloor;
-    private final double eliteAttackFloor;
-    private final double minibossAttackFloor;
-    private final double rareBossAttackFloor;
-    private final double maxAmplifierCompensation;
+  private final MobScalingPolicy delegate;
 
-    public MobCombatBalance(int maxMobLevel,
-                            int normalMinOffset, int normalMaxOffset,
-                            int eliteMinOffset, int eliteMaxOffset,
-                            int minibossMinOffset, int minibossMaxOffset,
-                            int rareBossMinOffset, int rareBossMaxOffset,
-                            double normalBaseHp, double normalHpPerLevel,
-                            double normalMultiplier, double eliteMultiplier,
-                            double minibossMultiplier, double rareBossMultiplier,
-                            double normalAttackFloor, double eliteAttackFloor,
-                            double minibossAttackFloor, double rareBossAttackFloor,
-                            double maxAmplifierCompensation) {
-        this.maxMobLevel = Math.max(1, maxMobLevel);
-        this.normalMinOffset = Math.min(normalMinOffset, normalMaxOffset);
-        this.normalMaxOffset = Math.max(normalMinOffset, normalMaxOffset);
-        this.eliteMinOffset = Math.min(eliteMinOffset, eliteMaxOffset);
-        this.eliteMaxOffset = Math.max(eliteMinOffset, eliteMaxOffset);
-        this.minibossMinOffset = Math.min(minibossMinOffset, minibossMaxOffset);
-        this.minibossMaxOffset = Math.max(minibossMinOffset, minibossMaxOffset);
-        this.rareBossMinOffset = Math.min(rareBossMinOffset, rareBossMaxOffset);
-        this.rareBossMaxOffset = Math.max(rareBossMinOffset, rareBossMaxOffset);
-        this.normalBaseHp = safePositive(normalBaseHp, 400);
-        this.normalHpPerLevel = safePositive(normalHpPerLevel, 40);
-        this.normalMultiplier = safePositive(normalMultiplier, 1);
-        this.eliteMultiplier = safePositive(eliteMultiplier, 3);
-        this.minibossMultiplier = safePositive(minibossMultiplier, 8);
-        this.rareBossMultiplier = safePositive(rareBossMultiplier, 18);
-        this.normalAttackFloor = safePositive(normalAttackFloor, 6);
-        this.eliteAttackFloor = safePositive(eliteAttackFloor, 12);
-        this.minibossAttackFloor = safePositive(minibossAttackFloor, 25);
-        this.rareBossAttackFloor = safePositive(rareBossAttackFloor, 50);
-        this.maxAmplifierCompensation = Math.max(0, Math.min(0.5, finite(maxAmplifierCompensation, 0.5)));
-    }
+  public MobCombatBalance(
+      int maxMobLevel,
+      int normalMinOffset,
+      int normalMaxOffset,
+      int eliteMinOffset,
+      int eliteMaxOffset,
+      int minibossMinOffset,
+      int minibossMaxOffset,
+      int rareBossMinOffset,
+      int rareBossMaxOffset,
+      double normalBaseHp,
+      double normalHpPerLevel,
+      double normalMultiplier,
+      double eliteMultiplier,
+      double minibossMultiplier,
+      double rareBossMultiplier,
+      double normalAttackFloor,
+      double eliteAttackFloor,
+      double minibossAttackFloor,
+      double rareBossAttackFloor,
+      double maxAmplifierCompensation) {
+    this.delegate =
+        new MobScalingPolicy(
+            maxMobLevel,
+            normalMinOffset,
+            normalMaxOffset,
+            eliteMinOffset,
+            eliteMaxOffset,
+            minibossMinOffset,
+            minibossMaxOffset,
+            rareBossMinOffset,
+            rareBossMaxOffset,
+            normalBaseHp,
+            normalHpPerLevel,
+            normalMultiplier,
+            eliteMultiplier,
+            minibossMultiplier,
+            rareBossMultiplier,
+            normalAttackFloor,
+            eliteAttackFloor,
+            minibossAttackFloor,
+            rareBossAttackFloor,
+            maxAmplifierCompensation);
+  }
 
-    public int effectiveCombatLevel(int swordLevel, int prestige) {
-        int safeSwordLevel = Math.max(1, swordLevel);
-        int safePrestige = Math.max(0, prestige);
-        long prestigeFloor = 1L + (long) safePrestige * 20L;
-        return (int) Math.min(Integer.MAX_VALUE, Math.max(safeSwordLevel, prestigeFloor));
-    }
+  public int effectiveCombatLevel(int swordLevel, int prestige) {
+    return delegate.effectiveCombatLevel(swordLevel, prestige);
+  }
 
-    public MobLevelRange levelRange(int swordLevel, int prestige, MobKind kind) {
-        int effective = effectiveCombatLevel(swordLevel, prestige);
-        return rangeFor(effective, kind);
-    }
+  public MobLevelRange levelRange(int swordLevel, int prestige, MobKind kind) {
+    MobScalingPolicy.MobLevelRange range =
+        delegate.levelRange(swordLevel, prestige, toDomain(kind));
+    return new MobLevelRange(range.minimum(), range.maximum());
+  }
 
-    public int selectMobLevel(int swordLevel, int prestige, MobKind kind) {
-        MobLevelRange range = levelRange(swordLevel, prestige, kind);
-        return ThreadLocalRandom.current().nextInt(range.minimum(), range.maximum() + 1);
-    }
+  public int selectMobLevel(int swordLevel, int prestige, MobKind kind) {
+    return delegate.selectMobLevel(swordLevel, prestige, toDomain(kind));
+  }
 
-    public int clampLevel(int level) {
-        return Math.max(1, Math.min(maxMobLevel, level));
-    }
+  public int clampLevel(int level) {
+    return delegate.clampLevel(level);
+  }
 
-    public double profileHp(int mobLevel, MobKind kind) {
-        double base = normalBaseHp + (Math.max(1, mobLevel) * normalHpPerLevel);
-        return base * multiplier(kind);
-    }
+  public double profileHp(int mobLevel, MobKind kind) {
+    return delegate.profileHp(mobLevel, toDomain(kind));
+  }
 
-    public double minimumHp(int mobLevel, MobKind kind, double strongestNormalHitDamage) {
-        return Math.max(0, finite(strongestNormalHitDamage, 0)) * attacksRequired(kind);
-    }
+  public double minimumHp(int mobLevel, MobKind kind, double strongestNormalHitDamage) {
+    return delegate.minimumHp(mobLevel, toDomain(kind), strongestNormalHitDamage);
+  }
 
-    public double finalHp(int mobLevel, MobKind kind, double strongestNormalHitDamage,
-                          double requestedAmplifierCompensation) {
-        double compensation = Math.max(0, Math.min(maxAmplifierCompensation,
-                finite(requestedAmplifierCompensation, 0)));
-        return Math.max(profileHp(mobLevel, kind), minimumHp(mobLevel, kind, strongestNormalHitDamage))
-                * (1 + compensation);
-    }
+  public double finalHp(
+      int mobLevel,
+      MobKind kind,
+      double strongestNormalHitDamage,
+      double requestedAmplifierCompensation) {
+    return delegate.finalHp(
+        mobLevel, toDomain(kind), strongestNormalHitDamage, requestedAmplifierCompensation);
+  }
 
-    public double boundedAmplifierCompensation(double requested) {
-        return Math.max(0, Math.min(maxAmplifierCompensation, finite(requested, 0)));
-    }
+  public double boundedAmplifierCompensation(double requested) {
+    return delegate.boundedAmplifierCompensation(requested);
+  }
 
-    private MobLevelRange rangeFor(int effective, MobKind kind) {
-        int minimum;
-        int maximum;
-        switch (kind == null ? MobKind.NORMAL : kind) {
-            case ELITE -> {
-                minimum = effective + eliteMinOffset;
-                maximum = effective + eliteMaxOffset;
-            }
-            case MINIBOSS -> {
-                minimum = effective + minibossMinOffset;
-                maximum = effective + minibossMaxOffset;
-            }
-            case RARE_BOSS -> {
-                minimum = effective + rareBossMinOffset;
-                maximum = effective + rareBossMaxOffset;
-            }
-            default -> {
-                minimum = effective + normalMinOffset;
-                maximum = effective + normalMaxOffset;
-            }
+  /** Returns the canonical framework-free policy used by this compatibility facade. */
+  public MobScalingPolicy policy() {
+    return delegate;
+  }
+
+  private static MobScalingPolicy.MobKind toDomain(MobKind kind) {
+    return kind == null
+        ? MobScalingPolicy.MobKind.NORMAL
+        : MobScalingPolicy.MobKind.valueOf(kind.name());
+  }
+
+  public enum MobKind {
+    NORMAL,
+    ELITE,
+    MINIBOSS,
+    RARE_BOSS;
+
+    public static MobKind from(String value) {
+      if (value == null) {
+        return NORMAL;
+      }
+      return switch (value.trim().toUpperCase(java.util.Locale.ROOT).replace('-', '_')) {
+        case "ELITE" -> ELITE;
+        case "MINIBOSS", "MINI_BOSS" -> MINIBOSS;
+        case "RARE_BOSS", "RAREBOSS", "BOSS" -> RARE_BOSS;
+        default -> {
+          String normalized = value.trim().toLowerCase(java.util.Locale.ROOT);
+          if (normalized.contains("rare") && normalized.contains("boss")) {
+            yield RARE_BOSS;
+          }
+          if (normalized.contains("mini") && normalized.contains("boss")) {
+            yield MINIBOSS;
+          }
+          yield normalized.contains("elite") ? ELITE : NORMAL;
         }
-        return new MobLevelRange(clampLevel(minimum), clampLevel(maximum));
+      };
     }
+  }
 
-    private double multiplier(MobKind kind) {
-        return switch (kind == null ? MobKind.NORMAL : kind) {
-            case ELITE -> eliteMultiplier;
-            case MINIBOSS -> minibossMultiplier;
-            case RARE_BOSS -> rareBossMultiplier;
-            default -> normalMultiplier;
-        };
+  public record MobLevelRange(int minimum, int maximum) {
+    public MobLevelRange {
+      minimum = Math.max(1, minimum);
+      maximum = Math.max(minimum, maximum);
     }
-
-    private double attacksRequired(MobKind kind) {
-        return switch (kind == null ? MobKind.NORMAL : kind) {
-            case ELITE -> eliteAttackFloor;
-            case MINIBOSS -> minibossAttackFloor;
-            case RARE_BOSS -> rareBossAttackFloor;
-            default -> normalAttackFloor;
-        };
-    }
-
-    private static double safePositive(double value, double fallback) {
-        return Math.max(0, finite(value, fallback));
-    }
-
-    private static double finite(double value, double fallback) {
-        return Double.isFinite(value) ? value : fallback;
-    }
-
-    public enum MobKind {
-        NORMAL, ELITE, MINIBOSS, RARE_BOSS;
-
-        public static MobKind from(String value) {
-            if (value == null) {
-                return NORMAL;
-            }
-            return switch (value.trim().toUpperCase(java.util.Locale.ROOT).replace('-', '_')) {
-                case "ELITE" -> ELITE;
-                case "MINIBOSS", "MINI_BOSS" -> MINIBOSS;
-                case "RARE_BOSS", "RAREBOSS", "BOSS" -> RARE_BOSS;
-                default -> {
-                    String normalized = value.trim().toLowerCase(java.util.Locale.ROOT);
-                    if (normalized.contains("rare") && normalized.contains("boss")) {
-                        yield RARE_BOSS;
-                    }
-                    if (normalized.contains("mini") && normalized.contains("boss")) {
-                        yield MINIBOSS;
-                    }
-                    yield normalized.contains("elite") ? ELITE : NORMAL;
-                }
-            };
-        }
-    }
-
-    public record MobLevelRange(int minimum, int maximum) {
-        public MobLevelRange {
-            minimum = Math.max(1, minimum);
-            maximum = Math.max(minimum, maximum);
-        }
-    }
+  }
 }

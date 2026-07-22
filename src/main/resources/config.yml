@@ -48,9 +48,6 @@ DungeonHero:
     BaseXPRequired: 100
     XPRequiredMultiplier: 1.25
     MaxSwordLevel: 100
-    Prestige:
-      Enabled: true
-      MaxPrestige: 5
   HeroAscension:
     Enabled: true
     RequiredSwordLevel: 100
@@ -143,10 +140,8 @@ DungeonHero:
     SearchRadius: 32
     MobLevelSource: EFFECTIVE_SWORD_LEVEL
     PartyScalingMode: HIGHEST
-    PartyMode: HIGHEST
     MaxPlayers: 5
     MaximumMobLevel: 104
-    MaxLevel: 104
     LevelOffsets:
       Normal: {Min: -2, Max: 4}
       Elite: {Min: 0, Max: 4}

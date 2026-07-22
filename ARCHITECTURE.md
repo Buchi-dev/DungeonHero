@@ -94,3 +94,72 @@ The complete training dummy feature is isolated under `feature/trainingdummy`, s
 4. Add new admin actions under `command` with a dedicated permission node.
 5. Do not use broad entity removal; always check DungeonHero persistent data keys.
 6. Keep forge transactions in `feature/forge`; GUI input and output slots must be explicitly protected and revalidated before consuming inputs.
+
+## Pure domain extraction
+
+The current cleanup introduces a framework-free domain layer:
+
+- `feature.sword.HeroSwordState`, `SwordComparator`, `SwordProgressionCalculator`, and `FragmentCapPolicy`.
+- `feature.rank.RankPolicy`.
+- `feature.quest.QuestScoringPolicy` and `RewardPolicy`.
+- `integration.mythicmobs.MobScalingPolicy`.
+
+`HeroItemService`, `DungeonRankService`, `SwordProgressionService`, `DungeonRushService`, and
+`HeroSwordMobScaler` translate Bukkit or MythicMobs objects at the edge, invoke these policies, and
+apply the results. `MobCombatBalance` remains as the runtime MythicMobs adapter
+used by `HeroSwordMobScaler`; the duplicate progression, fragment-cap, and
+rank-cap compatibility facades were removed after repository-wide reference
+verification.
+
+## Service boundaries
+
+- `DungeonRushService` owns lifecycle orchestration and presentation.
+- `DungeonRushConfiguration` owns Dungeon Rush configuration parsing.
+- `DungeonRushRoundState` owns round transitions and score state.
+- `DungeonRushLeaderboard` owns leaderboard ordering.
+- `DungeonRushRewardDistributor` owns Bukkit reward delivery.
+- `DungeonRushListener` and `SwordProgressionListener` are event-only adapters.
+- `HeroSwordItemCodec` owns Hero Sword PDC encoding/decoding; `HeroItemService` owns sword rules.
+- `common.ItemDeliveryService`, `PlayerResolver`, `ConfigValues`, and `MythicDeathDeduplicator` are shared edge utilities.
+
+## Command boundaries
+
+`DungeonHeroCommand` is only the `/dh` router. It handles command identity,
+the help/version fallbacks, handler lookup, and delegation. Command behavior is
+split into focused handlers:
+
+- `SwordCommand`: sword status, forge, and prestige.
+- `RankCommand`: rank status and rank-up.
+- `QuestCommand`: Dungeon Rush status and leaderboard.
+- `PartyCommand`: party actions and broadcasts.
+- `EconomyCommand`: balances and coin transfers.
+- `AdminCommand`: reload, item grants, coin administration, sword resets, and dummies.
+
+`CommandSupport` centralizes permission inheritance, player resolution, numeric
+argument parsing, usage output, and case-insensitive completion matching.
+`CommandCompletionService` owns the completion catalog and route-specific
+argument suggestions. This keeps Bukkit command plumbing at the edge while
+making each handler independently replaceable and reviewable.
+
+## Bootstrap lifecycle
+
+`DungeonHeroPlugin` is intentionally limited to resource setup, component startup, command binding,
+and public API delegation. `DungeonHeroComponents` owns dependency creation. `PluginModuleRegistry`
+invokes modules in dependency order for `load`, `reload`, and `start`, registers listeners centrally,
+and closes modules in reverse order. The framework feature registry remains responsible for its own
+feature listener because it is a reusable framework lifecycle boundary.
+
+## Configuration boundary
+
+`config.DungeonHeroConfiguration` is the only reader of the main `config.yml`.
+It converts YAML into immutable records for progression, swords, ascension,
+fragments, ranks, HUD, MythicMob scaling, damage protection, parties, Dungeon
+Rush, training dummies, and administration. Feature services receive those
+snapshots and do not depend on Bukkit configuration APIs.
+
+Canonical duplicate-key names are `HeroAscension.*` over
+`Progression.Prestige.*`, `FragmentCaps.*` over `Fragments.Caps.*`,
+`MobScaling.MaximumMobLevel` over `MobScaling.MaxLevel`, and
+`MobScaling.PartyScalingMode` over `MobScaling.PartyMode`. Legacy keys remain
+read-only compatibility aliases and emit a migration warning whenever they
+are present. The shipped config contains canonical keys only.
