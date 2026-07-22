@@ -4,6 +4,51 @@
 
 `DungeonHeroPlugin` is the composition root. It creates services, registers listeners, starts scheduled tasks, and attaches the command executor. Gameplay behavior belongs in feature packages.
 
+## Gameplay framework
+
+`com.dungeonhero.framework` is the reusable gameplay layer. `GameplayFramework`
+owns the event bus, state store, timer/cooldown service, and registries for
+features, objectives, conditions, actions, rewards, and triggers.
+`FeatureRegistry` validates each feature's YAML section before loading it and
+coordinates idempotent stop/load/start transitions during `/dh reload`.
+
+The existing Open-World Dungeon loop is represented by
+`feature/openworlddungeon/OpenWorldDungeonFeature`. It does not replace
+DungeonCore or duplicate the existing sword, party, or MythicMobs
+services. It converts player mob defeats into framework events and composes
+configured objectives and rewards around them. DungeonCore remains the
+authoritative world spawner and completion owner.
+
+To create a module, implement `GameplayFeature`, register it with
+`plugin.getGameplayFramework().features()`, and use the injected
+`FeatureContext` in `load`/`start`. Custom objectives implement
+`GameplayObjective`; custom rewards implement `GameplayReward`. Register their
+types once at bootstrap, then reference those types from the feature YAML.
+
+Framework configuration lives under `DungeonHero.Gameplay.Features` so the
+project's existing PascalCase YAML convention remains intact:
+
+```yaml
+DungeonHero:
+  Gameplay:
+    Features:
+      open-world-dungeon:
+        Enabled: true
+        ConfigVersion: 1
+        Objectives:
+          - Type: defeat_mobs
+            Mob: ZOMBIE
+            Amount: 20
+        Rewards:
+          - Type: item
+            Material: DIAMOND
+            Amount: 2
+```
+
+Invalid feature configuration disables only that feature and logs the exact
+path and reason. Existing services still use their original configuration
+paths and reload behavior, so this framework addition is backward compatible.
+
 ```text
 com.dungeonhero
 ├── command                 /dh routing and admin permissions
@@ -13,6 +58,7 @@ com.dungeonhero
 │   ├── rank
 │   ├── party
 │   ├── coins
+│   ├── quest
 │   └── trainingdummy
 ├── integration             external plugin adapters
 │   └── mythicmobs

@@ -1,0 +1,70 @@
+# DungeonHero MythicMobs registry
+# Add or change mappings here without rebuilding DungeonHero.
+# Unknown DH_/DW_ mobs still receive the normal Mythic profile when prefix
+# tracking is enabled, but explicit mappings unlock custom scaling and rewards.
+
+Profiles:
+  normal:
+    LevelOffset: 0
+    SwordXP: 25
+
+  elite:
+    LevelOffset: 3
+    SwordXP: 100
+
+  miniboss:
+    LevelOffset: 6
+    SwordXP: 400
+
+  rare_boss:
+    LevelOffset: 8
+    SwordXP: 1000
+
+Mobs:
+  DH_GroveStalker: {Profile: normal}
+  DH_MossboundSkeleton: {Profile: normal}
+  DH_AridHusk: {Profile: normal}
+  DH_BadlandsStray: {Profile: normal}
+  DH_BogboundZombie: {Profile: normal}
+  DH_MireWitch: {Profile: normal}
+  DH_FrostStray: {Profile: normal}
+  DH_FrostSpider: {Profile: normal}
+  DH_VineSpider: {Profile: normal}
+  DH_TempleWitch: {Profile: normal}
+  DH_TideDrowned: {Profile: normal}
+  DH_AbyssalGuardian: {Profile: normal}
+  DH_CursedVindicator: {Profile: normal}
+  DH_ShadowSpider: {Profile: normal}
+  DH_CaveSpider: {Profile: normal}
+  DH_DeepSilverfish: {Profile: normal}
+  DW_Cryptling: {Profile: normal}
+  DW_BoneArcher: {Profile: normal}
+
+  DH_HeartwoodBrute: {Profile: elite}
+  DH_DuneColossus: {Profile: elite}
+  DH_MireAbomination: {Profile: elite}
+  DH_GlacierRavager: {Profile: elite}
+  DH_JadebackSentinel: {Profile: elite}
+  DH_AbyssalLeviathan: {Profile: elite}
+  DH_ManorRelicKeeper: {Profile: elite}
+  DH_CavernTyrant: {Profile: elite}
+  DW_SoulReaver: {Profile: elite}
+
+  DH_BriarMatriarch: {Profile: miniboss}
+  DH_SunkenPharaoh: {Profile: miniboss}
+  DH_BogWitchQueen: {Profile: miniboss}
+  DH_FrostboundGoliath: {Profile: miniboss}
+  DH_TempleOverlord: {Profile: miniboss}
+  DH_OceanicLeviathan: {Profile: miniboss}
+  DH_PaleGardenWarden: {Profile: miniboss}
+  DH_DeepstoneBehemoth: {Profile: miniboss}
+
+  DH_VerdantSovereign: {Profile: rare_boss}
+  DH_SandstormTyrant: {Profile: rare_boss}
+  DH_MireSovereign: {Profile: rare_boss}
+  DH_WinterColossus: {Profile: rare_boss}
+  DH_OvergrownTitan: {Profile: rare_boss}
+  DH_AbyssalEmperor: {Profile: rare_boss}
+  DH_PaleheartReaper: {Profile: rare_boss}
+  DH_DeepstoneOverlord: {Profile: rare_boss}
+  DW_CryptLord: {Profile: rare_boss}

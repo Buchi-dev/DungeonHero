@@ -1,5 +1,31 @@
 DungeonHero:
   Locale: en_us
+  Gameplay:
+    ConfigVersion: 1
+    Debug: false
+    Features:
+      # The existing Dungeon_world/DungeonCore loop remains authoritative for spawning.
+      # This feature composes framework objectives and rewards around that loop.
+      open-world-dungeon:
+        Enabled: true
+        ConfigVersion: 1
+        Worlds:
+          - dungeon_world
+        Objectives:
+          - Id: crypt-zombies
+            Type: defeat_mobs
+            Mob: ZOMBIE
+            Amount: 20
+        Conditions: []
+        Actions: []
+        Rewards:
+          - Id: crypt-diamond-reward
+            Type: item
+            Material: DIAMOND
+            Amount: 2
+        Timers:
+          completion-cooldown-seconds: 60
+        Triggers: []
   Fragments:
     "mm:HeroDamageFragment":
       Type: fragment
@@ -22,6 +48,9 @@ DungeonHero:
     BaseXPRequired: 100
     XPRequiredMultiplier: 1.25
     MaxSwordLevel: 100
+    Prestige:
+      Enabled: true
+      MaxPrestige: 5
   Ranks:
     CoinName: "Dungeon Coins"
     List:
@@ -101,105 +130,34 @@ DungeonHero:
     MaxSize: 5
     RequireSameWorld: true
     InvitationSeconds: 60
-  Reputation:
+  DungeonRush:
     Enabled: true
     Worlds:
       - dungeon_world
-    TrackDungeonHeroPrefixes: true
-    HostileActivityTarget: 50
-    MythicActivityTarget: 10
-    EliteDailyLimit: 2
-    MinibossDailyLimit: 1
-    RareBossDailyLimit: 2
-    DailyContributionCap: 500
+    Biomes: []
+    DurationMinutes: 5
+    IntervalMinutes: 60
+    FirstDelayMinutes: 5
+    MinimumKills: 1
+    QuestTypes:
+      - MOST_DUNGEON_MOBS_KILLED
+      - MOST_MYTHIC_MOBS_KILLED
     Rewards:
-      MinibossReputation: 50
-      RareBossReputation: 150
-    Contract:
-      HostileTarget: 40
-      MythicTarget: 10
-      EliteTarget: 1
-      ReputationReward: 30
-      ContributionReward: 40
-    PublicEvents:
-      Enabled: true
-      Goal: 75
-      ReputationReward: 250
-      DurationMinutes: 25
-      IntervalMinutes: 180
-      FirstDelayMinutes: 30
-    Prestige:
-      Enabled: true
-      RequiredReputation: 10000
-      MaxPrestige: 5
-    MythicMobIds:
-      Variants:
-        - DH_GroveStalker
-        - DH_MossboundSkeleton
-        - DH_AridHusk
-        - DH_BadlandsStray
-        - DH_BogboundZombie
-        - DH_MireWitch
-        - DH_FrostStray
-        - DH_FrostSpider
-        - DH_VineSpider
-        - DH_TempleWitch
-        - DH_TideDrowned
-        - DH_AbyssalGuardian
-        - DH_CursedVindicator
-        - DH_ShadowSpider
-        - DH_CaveSpider
-        - DH_DeepSilverfish
-        - DW_Cryptling
-        - DW_BoneArcher
-      Elites:
-        - DH_HeartwoodBrute
-        - DH_DuneColossus
-        - DH_MireAbomination
-        - DH_GlacierRavager
-        - DH_JadebackSentinel
-        - DH_AbyssalLeviathan
-        - DH_ManorRelicKeeper
-        - DH_CavernTyrant
-        - DW_SoulReaver
-      Minibosses:
-        - DH_BriarMatriarch
-        - DH_SunkenPharaoh
-        - DH_BogWitchQueen
-        - DH_FrostboundGoliath
-        - DH_TempleOverlord
-        - DH_OceanicLeviathan
-        - DH_PaleGardenWarden
-        - DH_DeepstoneBehemoth
-      RareBosses:
-        - DH_VerdantSovereign
-        - DH_SandstormTyrant
-        - DH_MireSovereign
-        - DH_WinterColossus
-        - DH_OvergrownTitan
-        - DH_AbyssalEmperor
-        - DH_PaleheartReaper
-        - DH_DeepstoneOverlord
-        - DW_CryptLord
-    Ranks:
-      "1":
-        Name: Uncharted
-        Required: 0
-      "2":
-        Name: Recognized
-        Required: 500
-      "3":
-        Name: Dangerous
-        Required: 1500
-      "4":
-        Name: Notorious
-        Required: 3500
-      "5":
-        Name: Renowned
-        Required: 6000
-      "6":
-        Name: Legendary
-        Required: 10000
+      First:
+        - Type: coins
+          Amount: 100
+        - Type: sword_xp
+          Amount: 25
+      Second:
+        - Type: coins
+          Amount: 75
+        - Type: sword_xp
+          Amount: 25
+      Third:
+        - Type: coins
+          Amount: 50
+        - Type: sword_xp
+          Amount: 25
   TargetDummy:
     Enabled: true
     Health: 1000

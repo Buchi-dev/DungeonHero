@@ -16,7 +16,7 @@ On Windows:
 .\gradlew.bat build
 ```
 
-The plugin JAR is generated at `build/libs/DungeonHero-1.7.5.jar`.
+The plugin JAR is generated at `build/libs/DungeonHero-2.0.1.jar`.
 
 Copy that JAR into the server's `plugins` directory and restart the server. Once loaded, `/dungeonhero` (or `/dh`) confirms that the plugin is active.
 
@@ -67,10 +67,9 @@ paid twice.
 - `/dh rank` shows Dungeon Rank, Sword Level cap, and the Dungeon Coin balance.
 - `/dh balance` shows the sender's independent Dungeon Coin balance.
 - `/dh transfer <player> <amount>` transfers Dungeon Coins to another player.
+- `/dh quest` shows the automatic five-minute Dungeon Rush.
+- `/dh quest top` shows the current or most recent Dungeon Rush leaderboard.
 - `/dh rankup` spends Dungeon Coins to increase Dungeon Rank.
-- `/dh reputation` shows shared Dungeon Reputation, rank, and public event status.
-- `/dh reputation contract` shows the player's daily biome contract.
-- `/dh reputation top` shows the weekly Dungeon contributor leaderboard.
 - `/dh party` opens the party command help for parties of up to 5 players.
 - Player-facing rank, sword, help, and rank-up messages use formatted Adventure panels.
 - Hero Sword lore is grouped into progression, power, and forge sections.
@@ -87,32 +86,105 @@ paid twice.
 - Dungeon worlds keep the player's normal Minecraft inventory. The Hero Forge
   is optional, and MythicMobs fragments remain physical inventory items.
 
-## Dungeon Reputation
+## Automatic Dungeon Rush quests
 
-Version 1.7.5 adds a server-wide Dungeon Reputation system for `dungeon_world`.
-Vanilla hostile mobs, DungeonHero Mythic variants, elites, five-minute
-minibosses, and rare biome bosses contribute to capped daily biome activity.
-Passive mobs and Mythic reinforcements do not generate reputation. Minibosses
-remain valuable after their daily reputation credit through their XP and loot.
+DungeonHero can run automatic five-minute leaderboard quests. Players do not
+need to join manually: a player is registered only after their first
+qualifying kill during the active round. Players who do not kill anything do
+not appear on the leaderboard.
 
-The system stores its progress separately in `plugins/DungeonHero/reputation.yml`.
-Players receive a rotating daily contract, personal weekly Contribution, and
-credit when fighting with nearby party members. Routine activity is capped so
-one mob farm cannot rush the shared ranks. Public events start on a timer,
-summon the matching rare biome boss when a player enters the target biome, and
-award a larger reputation bonus when the community completes both objectives.
+The default quest pool randomly selects between killing the most Dungeon mobs
+and killing the most Mythic mobs. Only kills in the configured
+`DungeonHero.DungeonRush.Worlds` count. The top three players receive their
+configured rewards when the round ends. Use `/dh quest` to see the timer and
+`/dh quest top` to see the leaderboard. Configure the round schedule, minimum
+kills, quest pool, and rewards under `DungeonHero.DungeonRush` in `config.yml`.
 
-Reputation ranks are content and prestige milestones rather than raw combat
-stat bonuses: Uncharted, Recognized, Dangerous, Notorious, Renowned, and
-Legendary. The defaults can be tuned under `DungeonHero.Reputation` in
-`config.yml`. Use `/dh admin reputation set <amount>` or `add <amount>` for
-controlled testing; the command requires `dungeonhero.admin.reputation`.
+Each placement accepts a list of reward definitions. Supported types are
+`coins`, `sword_xp`, `item`, and `command`:
+
+```yaml
+Rewards:
+  First:
+    - Type: coins
+      Amount: 100
+    - Type: item
+      Material: DIAMOND
+      Amount: 3
+    - Type: command
+      Command: "give %player% golden_apple 2"
+```
+
+Command rewards run as console and support these placeholders:
+
+| Placeholder | Value |
+|---|---|
+| `%player%` | Winner's Minecraft name |
+| `%uuid%` | Winner's UUID |
+| `%place%` | Winner's place: 1, 2, or 3 |
+| `%kills%` | Winner's kill count |
+| `%quest_name%` / `%objective%` | Human-readable quest name |
+| `%quest_type%` | Quest type enum name |
+| `%quest_time_left%` / `%time_left%` | Remaining time, such as `4m 32s` |
+| `%quest_time_left_seconds%` | Remaining time in seconds |
+| `%quest_duration%` / `%duration%` | Full quest duration |
+| `%quest_duration_seconds%` | Full duration in seconds |
+| `%quest_biome%` / `%biome%` | Selected biome or `All Biomes` |
+| `%quest_world%` / `%world%` | Configured quest worlds |
+| `%quest_goal%` | `Top 3 players with the most kills` |
+| `%quest_round%` | Current round number |
+
+Set `DungeonRush.Biomes` to a list such as `PLAINS` or `DEEP_DARK` to restrict
+each round to a randomly selected biome. Leave it empty to allow all biomes.
+These placeholders allow server developers to grant ranks, keys, MythicMobs
+items, or rewards from other plugins.
+
+## Modular gameplay framework
+
+DungeonHero now exposes a reusable, configuration-driven gameplay framework.
+The framework is intentionally separate from the existing DungeonHero services
+and provides:
+
+- `GameplayFeature` and `FeatureRegistry` for registration and lifecycle.
+- Typed event dispatching through `FeatureEventBus`.
+- Feature-scoped state and clock-based timers/cooldowns.
+- Registries and extension interfaces for objectives, conditions, actions,
+  rewards, and triggers.
+- `PlayerContext` and `TeamContext` for portable gameplay context.
+- Configuration version checks and safe feature reloads.
+
+The Open-World Dungeon module is configured under
+`DungeonHero.Gameplay.Features.open-world-dungeon`. It listens to player mob
+defeats and supports the built-in `defeat_mobs` objective and `item` reward.
+DungeonCore remains the authoritative spawner and dungeon completion owner;
+the module does not pay DungeonCore rewards a second time.
+
+### Adding a feature
+
+Implement `GameplayFeature`, register it from the plugin composition root, and
+use `FeatureContext` to subscribe to framework events and access the registries.
+Keep Bukkit listeners and third-party API calls at the feature/integration edge.
+Feature configuration is validated before `load` and a failed feature is
+isolated from the other modules.
+
+### Adding an objective or reward
+
+Implement `GameplayObjective` or `GameplayReward`, give it a stable lowercase
+type, register it with `getGameplayFramework().objectives()` or `.rewards()`,
+and reference that type in a feature's YAML definitions. This avoids adding a
+new hardcoded branch to the framework for each future quest, boss, event, or
+progression module.
+
+The framework configuration uses the existing PascalCase convention and is
+safe to reload with `/dh reload`. Unsupported configuration versions and
+malformed definition lists are reported with their feature path and prevent
+only the affected feature from starting.
 
 ## Source organization
 
 The Java source is organized by ownership boundary:
 
-- `feature/sword`, `feature/forge`, `feature/rank`, `feature/party`, `feature/coins`, and `feature/trainingdummy` contain gameplay features.
+- `feature/sword`, `feature/forge`, `feature/rank`, `feature/party`, `feature/coins`, `feature/quest`, and `feature/trainingdummy` contain gameplay features.
 - `integration/mythicmobs` contains the remaining external-plugin adapter.
 - `command` contains `/dh` routing and administrative command behavior.
 - `messaging` contains player-facing Adventure panels.
@@ -196,14 +268,50 @@ DungeonHero:
     PartyMode: AVERAGE
     MaxPlayers: 5
     BaseLevel: 1
-    SwordLevelsPerMobLevel: 2
-    RankPowerBonus: 2.0
-    DamageBonusWeight: 0.5
-    PrestigeLevelBonus: 5
-    MaxLevel: 100
+    SwordLevelsPerMobLevel: 3.25
+    RankPowerBonus: 0.75
+    DamageBonusWeight: 0.12
+    PrestigeLevelBonus: 0.0
+    MaxLevel: 50
+    LevelOffsets:
+      Elite: 3
+      Miniboss: 6
+      RareBoss: 8
 ```
 
-`PartyMode` can be `NEAREST`, `AVERAGE`, or `MAX`. With the default configuration, every 2 points of party combat power adds one MythicMob level. Combat power is Sword Level plus half of the sword's Damage Bonus plus 5 per Prestige. MythicMobs then applies the mob's own `LevelModifiers` for health, damage, armor, and other stats.
+`PartyMode` can be `NEAREST`, `AVERAGE`, or `MAX`. MythicMobs then applies the
+mob's own `LevelModifiers` for health, damage, armor, and other stats.
+
+### MythicMob registry
+
+Mob classification is data-driven in `plugins/DungeonHero/mob-registry.yml`.
+Profiles define level offsets and Sword XP; the `Mobs` section maps MythicMobs
+internal IDs to profiles. Add a new mob
+without rebuilding DungeonHero:
+
+```yaml
+Profiles:
+  cursed_elite:
+    LevelOffset: 5
+    SwordXP: 175
+
+Mobs:
+  MY_CUSTOM_KNIGHT:
+    Profile: cursed_elite
+```
+
+Run `/dh reload` after editing the registry. Other plugins can register a mob
+at runtime through the public API:
+
+```java
+DungeonHeroPlugin dungeonHero = /* Bukkit plugin instance */;
+dungeonHero.getMobRegistry().register("MY_CUSTOM_KNIGHT",
+        new MobRegistryService.MobProfile("cursed_elite", 5, 175));
+```
+
+Runtime registrations survive DungeonHero reloads and take precedence over the
+YAML mapping. Unknown `DH_` and `DW_` IDs safely use the normal Mythic profile
+when prefix tracking is enabled.
 
 When `MobScaling.Worlds` is configured, only MythicMobs spawning in those worlds
 is scaled. `RankPowerBonus` adds direct Dungeon Rank power using
@@ -211,7 +319,9 @@ is scaled. `RankPowerBonus` adds direct Dungeon Rank power using
 reaches its new rank cap. The default setup enables scaling only in
 `dungeon_world` with a `RankPowerBonus` of 2.
 
-Prestige is available when the sword reaches `MaxSwordLevel`. It preserves fragment Damage Bonus, increases Prestige by one, and resets the sword to Level 1 and the Wood tier.
+Prestige is available when the sword reaches its current rank's maximum level.
+It preserves fragment Damage Bonus, increases Prestige by one, and resets the
+sword to Level 1 and the Wood tier.
 
 ## Sword XP
 
@@ -227,7 +337,11 @@ DungeonHero:
         - "&7Use this to increase Sword XP."
       XP: 25
     AutoMobKillXP: true
-    XPPerMobKill: 25
+    XPPerMobKill: 10
+    MythicMobXP: 25
+    EliteXP: 100
+    MinibossXP: 400
+    RareBossXP: 1000
     BaseXPRequired: 100
     XPRequiredMultiplier: 1.25
     MaxSwordLevel: 100

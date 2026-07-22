@@ -3,6 +3,7 @@ package com.dungeonhero.integration.mythicmobs;
 import com.dungeonhero.feature.party.PartyService;
 import com.dungeonhero.feature.rank.DungeonRankService;
 import com.dungeonhero.feature.sword.HeroItemService;
+import com.dungeonhero.feature.mobregistry.MobRegistryService;
 
 import io.lumine.mythic.bukkit.events.MythicMobPreSpawnEvent;
 import org.bukkit.Location;
@@ -23,23 +24,11 @@ import java.util.stream.Collectors;
 
 public final class HeroSwordMobScaler implements Listener {
 
-    private static final Set<String> ELITE_IDS = Set.of(
-            "DH_HEARTWOODBRUTE", "DH_DUNECOLOSSUS", "DH_MIREABOMINATION", "DH_GLACIERRAVAGER",
-            "DH_JADEBACKSENTINEL", "DH_ABYSSALLEVIATHAN", "DH_MANORRELICKEEPER",
-            "DH_CAVERNTYRANT", "DW_SOULREAVER");
-    private static final Set<String> MINIBOSS_IDS = Set.of(
-            "DH_BRIARMATRIARCH", "DH_SUNKENPHARAOH", "DH_BOGWITCHQUEEN", "DH_FROSTBOUNDGOLIATH",
-            "DH_TEMPLEOVERLORD", "DH_OCEANICLEVIATHAN", "DH_PALEGARDENWARDEN",
-            "DH_DEEPSTONEBEHEMOTH");
-    private static final Set<String> RARE_BOSS_IDS = Set.of(
-            "DH_VERDANTSOVEREIGN", "DH_SANDSTORMTYRANT", "DH_MIRESOVEREIGN", "DH_WINTERCOLOSSUS",
-            "DH_OVERGROWNTITAN", "DH_ABYSSALEMPEROR", "DH_PALEHEARTREAPER",
-            "DH_DEEPSTONEOVERLORD", "DW_CRYPTLORD");
-
     private final JavaPlugin plugin;
     private final HeroItemService heroItemService;
     private final PartyService partyService;
     private final DungeonRankService dungeonRankService;
+    private final MobRegistryService mobRegistryService;
 
     private boolean enabled;
     private Set<String> worlds;
@@ -52,17 +41,15 @@ public final class HeroSwordMobScaler implements Listener {
     private double damageBonusWeight;
     private double prestigeLevelBonus;
     private int maxLevel;
-    private int eliteLevelOffset;
-    private int minibossLevelOffset;
-    private int rareBossLevelOffset;
     private boolean debug;
 
     public HeroSwordMobScaler(JavaPlugin plugin, HeroItemService heroItemService, PartyService partyService,
-                              DungeonRankService dungeonRankService) {
+                              DungeonRankService dungeonRankService, MobRegistryService mobRegistryService) {
         this.plugin = plugin;
         this.heroItemService = heroItemService;
         this.partyService = partyService;
         this.dungeonRankService = dungeonRankService;
+        this.mobRegistryService = mobRegistryService;
         reload();
     }
 
@@ -86,12 +73,6 @@ public final class HeroSwordMobScaler implements Listener {
                 "DungeonHero.MobScaling.PrestigeLevelBonus", 0));
         maxLevel = Math.max(baseLevel,
                 plugin.getConfig().getInt("DungeonHero.MobScaling.MaxLevel", 50));
-        eliteLevelOffset = Math.max(0, plugin.getConfig().getInt(
-                "DungeonHero.MobScaling.LevelOffsets.Elite", 3));
-        minibossLevelOffset = Math.max(eliteLevelOffset, plugin.getConfig().getInt(
-                "DungeonHero.MobScaling.LevelOffsets.Miniboss", 6));
-        rareBossLevelOffset = Math.max(minibossLevelOffset, plugin.getConfig().getInt(
-                "DungeonHero.MobScaling.LevelOffsets.RareBoss", 8));
         debug = plugin.getConfig().getBoolean("DungeonHero.MobScaling.Debug", false);
     }
 
@@ -123,6 +104,7 @@ public final class HeroSwordMobScaler implements Listener {
         if (debug) {
             plugin.getLogger().info("Scaled " + mobId + " for " + nearbyPlayers.size()
                     + " player(s): power=" + String.format(Locale.ROOT, "%.2f", combatPower)
+                    + ", profile=" + mobRegistryService.profileOrDefault(mobId).name()
                     + ", level=" + boundedLevel);
         }
     }
@@ -149,17 +131,7 @@ public final class HeroSwordMobScaler implements Listener {
     }
 
     private int levelOffset(String internalName) {
-        String id = internalName == null ? "" : internalName.toUpperCase(Locale.ROOT);
-        if (RARE_BOSS_IDS.contains(id)) {
-            return rareBossLevelOffset;
-        }
-        if (MINIBOSS_IDS.contains(id)) {
-            return minibossLevelOffset;
-        }
-        if (ELITE_IDS.contains(id)) {
-            return eliteLevelOffset;
-        }
-        return 0;
+        return mobRegistryService.profileOrDefault(internalName).levelOffset();
     }
 
     private record CombatPower(Player player, double power, double distanceSquared) {

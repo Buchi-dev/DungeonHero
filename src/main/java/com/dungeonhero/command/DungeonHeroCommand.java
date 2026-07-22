@@ -3,8 +3,9 @@ package com.dungeonhero.command;
 import com.dungeonhero.feature.coins.DungeonCoinService;
 import com.dungeonhero.feature.forge.ForgeGui;
 import com.dungeonhero.feature.party.PartyService;
+import com.dungeonhero.feature.quest.DungeonRushService;
 import com.dungeonhero.feature.rank.DungeonRankService;
-import com.dungeonhero.feature.reputation.DungeonReputationService;
+import com.dungeonhero.feature.mobregistry.MobRegistryService;
 import com.dungeonhero.feature.sword.HeroItemService;
 import com.dungeonhero.feature.sword.HeroPlayerListener;
 import com.dungeonhero.feature.sword.HeroSwordStorage;
@@ -16,6 +17,7 @@ import com.dungeonhero.integration.mythicmobs.HeroSwordMobScaler;
 import com.dungeonhero.integration.mythicmobs.MythicFragmentService;
 import com.dungeonhero.messaging.DungeonHeroMessages;
 import com.dungeonhero.messaging.MessageService;
+import com.dungeonhero.framework.GameplayFramework;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -42,7 +44,7 @@ public final class DungeonHeroCommand implements TabExecutor {
     private static final String TRANSFER_PERMISSION = "dungeonhero.coins.transfer";
     private static final String ADMIN_COINS_PERMISSION = "dungeonhero.admin.coins";
     private static final List<String> SUBCOMMANDS = List.of(
-            "help", "reload", "forge", "give", "give-xp", "sword", "rank", "rankup", "reputation", "contract", "balance", "transfer", "admin", "party", "prestige", "dummy", "version"
+            "help", "reload", "forge", "give", "give-xp", "sword", "rank", "rankup", "balance", "transfer", "quest", "admin", "party", "prestige", "dummy", "version"
     );
     private static final List<String> PARTY_SUBCOMMANDS = List.of(
             "create", "invite", "accept", "info", "leave", "kick", "disband", "help"
@@ -63,7 +65,9 @@ public final class DungeonHeroCommand implements TabExecutor {
     private final ForgeGui forgeGui;
     private final MessageService messageService;
     private final DungeonCoinService dungeonCoinService;
-    private final DungeonReputationService dungeonReputationService;
+    private final MobRegistryService mobRegistryService;
+    private final GameplayFramework gameplayFramework;
+    private final DungeonRushService dungeonRushService;
 
     public DungeonHeroCommand(JavaPlugin plugin,
                               HeroItemService heroItemService,
@@ -80,7 +84,9 @@ public final class DungeonHeroCommand implements TabExecutor {
                               ForgeGui forgeGui,
                               MessageService messageService,
                               DungeonCoinService dungeonCoinService,
-                              DungeonReputationService dungeonReputationService) {
+                              MobRegistryService mobRegistryService,
+                              GameplayFramework gameplayFramework,
+                              DungeonRushService dungeonRushService) {
         this.plugin = plugin;
         this.heroItemService = heroItemService;
         this.heroSwordStorage = heroSwordStorage;
@@ -96,7 +102,9 @@ public final class DungeonHeroCommand implements TabExecutor {
         this.forgeGui = forgeGui;
         this.messageService = messageService;
         this.dungeonCoinService = dungeonCoinService;
-        this.dungeonReputationService = dungeonReputationService;
+        this.mobRegistryService = mobRegistryService;
+        this.gameplayFramework = gameplayFramework;
+        this.dungeonRushService = dungeonRushService;
     }
 
     @Override
@@ -133,6 +141,11 @@ public final class DungeonHeroCommand implements TabExecutor {
             return true;
         }
 
+        if (args[0].equalsIgnoreCase("quest")) {
+            handleQuest(sender, args);
+            return true;
+        }
+
         if (args[0].equalsIgnoreCase("admin")) {
             handleAdmin(sender, args);
             return true;
@@ -163,20 +176,6 @@ public final class DungeonHeroCommand implements TabExecutor {
                 return true;
             }
             DungeonHeroMessages.sendRankUpResult(player, dungeonRankService.rankUp(player), dungeonRankService);
-            return true;
-        }
-
-        if (args[0].equalsIgnoreCase("reputation") || args[0].equalsIgnoreCase("rep")) {
-            handleReputation(sender, args);
-            return true;
-        }
-
-        if (args[0].equalsIgnoreCase("contract")) {
-            if (!(sender instanceof Player player)) {
-                sender.sendMessage(Component.text("Only players can view daily contracts.", NamedTextColor.RED));
-                return true;
-            }
-            dungeonReputationService.sendContract(player);
             return true;
         }
 
@@ -220,6 +219,7 @@ public final class DungeonHeroCommand implements TabExecutor {
 
     private void reloadServices(CommandSender sender) {
         plugin.reloadConfig();
+        mobRegistryService.reload();
         messageService.reload();
         mythicFragmentService.reload();
         dungeonRankService.reload();
@@ -229,7 +229,8 @@ public final class DungeonHeroCommand implements TabExecutor {
         swordHudService.reload();
         trainingDummyService.reload();
         dungeonCoinService.reload();
-        dungeonReputationService.reload();
+        dungeonRushService.reload();
+        gameplayFramework.reload(plugin.getConfig().getConfigurationSection("DungeonHero.Gameplay.Features"));
         sender.sendMessage(messageService.text("command.reload_complete",
                 "DungeonHero configuration reloaded. Use /mm reload for MythicMobs changes.")
                 .color(NamedTextColor.GREEN));
@@ -366,14 +367,22 @@ public final class DungeonHeroCommand implements TabExecutor {
         }
     }
 
-    private void handleAdmin(CommandSender sender, String[] args) {
-        if (args.length >= 2 && args[1].equalsIgnoreCase("reputation")) {
-            handleAdminReputation(sender, args);
+    private void handleQuest(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(Component.text("Only players can view Dungeon Rush quests.", NamedTextColor.RED));
             return;
         }
+        if (args.length >= 2 && args[1].equalsIgnoreCase("top")) {
+            dungeonRushService.sendTop(player);
+            return;
+        }
+        dungeonRushService.sendStatus(player);
+    }
+
+    private void handleAdmin(CommandSender sender, String[] args) {
         if (args.length < 2 || !args[1].equalsIgnoreCase("coins")) {
             sender.sendMessage(Component.text(
-                    "Usage: /dh admin coins [set|add|take] <player> <amount> OR /dh admin reputation [set|add] <amount>", NamedTextColor.YELLOW));
+                    "Usage: /dh admin coins [set|add|take] <player> <amount>", NamedTextColor.YELLOW));
             return;
         }
         if (!requirePermission(sender, ADMIN_COINS_PERMISSION)) {
@@ -413,44 +422,6 @@ public final class DungeonHeroCommand implements TabExecutor {
         sender.sendMessage(Component.text("Updated " + targetName + " to "
                 + dungeonCoinService.format(dungeonCoinService.getBalance(target.getUniqueId()))
                 + " Dungeon Coins.", NamedTextColor.GREEN));
-    }
-
-    private void handleAdminReputation(CommandSender sender, String[] args) {
-        if (!requirePermission(sender, "dungeonhero.admin.reputation")) {
-            return;
-        }
-        if (args.length != 4 || (!args[2].equalsIgnoreCase("set") && !args[2].equalsIgnoreCase("add"))) {
-            sender.sendMessage(Component.text("Usage: /dh admin reputation [set|add] <amount>", NamedTextColor.YELLOW));
-            return;
-        }
-        Long amount = parseAmount(sender, args[3], args[2].equalsIgnoreCase("set"));
-        if (amount == null) {
-            return;
-        }
-        if (args[2].equalsIgnoreCase("set")) {
-            dungeonReputationService.setReputation(amount);
-        } else {
-            dungeonReputationService.addAdminReputation(amount);
-        }
-        sender.sendMessage(Component.text("Dungeon Reputation is now "
-                + String.format(Locale.ROOT, "%,d", dungeonReputationService.getReputation()) + ".",
-                NamedTextColor.GREEN));
-    }
-
-    private void handleReputation(CommandSender sender, String[] args) {
-        if (args.length >= 2 && args[1].equalsIgnoreCase("top")) {
-            dungeonReputationService.sendTop(sender);
-            return;
-        }
-        if (args.length >= 2 && args[1].equalsIgnoreCase("contract")) {
-            if (!(sender instanceof Player player)) {
-                sender.sendMessage(Component.text("Only players can view daily contracts.", NamedTextColor.RED));
-                return;
-            }
-            dungeonReputationService.sendContract(player);
-            return;
-        }
-        dungeonReputationService.sendStatus(sender);
     }
 
     private OfflinePlayer findOfflinePlayer(CommandSender sender, String name) {
@@ -529,9 +500,9 @@ public final class DungeonHeroCommand implements TabExecutor {
             return;
         }
 
-        boolean prestigeEnabled = plugin.getConfig().getBoolean("DungeonHero.Reputation.Prestige.Enabled", true);
+        boolean prestigeEnabled = plugin.getConfig().getBoolean("DungeonHero.Progression.Prestige.Enabled", true);
         int maxPrestige = Math.max(0, plugin.getConfig().getInt(
-                "DungeonHero.Reputation.Prestige.MaxPrestige", 5));
+                "DungeonHero.Progression.Prestige.MaxPrestige", 5));
         int currentPrestige = heroItemService.getSwordPrestige(sword);
         if (!prestigeEnabled) {
             player.sendMessage(Component.text("Prestige is currently disabled in this dungeon.", NamedTextColor.YELLOW));
@@ -542,14 +513,6 @@ public final class DungeonHeroCommand implements TabExecutor {
                     NamedTextColor.YELLOW));
             return;
         }
-        long requiredReputation = Math.max(0, plugin.getConfig().getLong(
-                "DungeonHero.Reputation.Prestige.RequiredReputation", 10_000));
-        if (dungeonReputationService.getReputation() < requiredReputation) {
-            player.sendMessage(Component.text("The dungeon needs " + String.format(Locale.ROOT, "%,d", requiredReputation)
-                    + " shared Reputation before Prestige is unlocked.", NamedTextColor.YELLOW));
-            return;
-        }
-
         var prestigedSword = heroItemService.withPrestige(sword);
         player.getInventory().setItem(swordSlot, prestigedSword);
         heroSwordStorage.save(player, prestigedSword);
@@ -669,8 +632,12 @@ public final class DungeonHeroCommand implements TabExecutor {
             return complete(args[1], Bukkit.getOnlinePlayers().stream().map(Player::getName).toList());
         }
 
+        if (args.length == 2 && args[0].equalsIgnoreCase("quest")) {
+            return complete(args[1], List.of("top"));
+        }
+
         if (args.length == 2 && args[0].equalsIgnoreCase("admin")) {
-            return complete(args[1], List.of("coins", "reputation"));
+            return complete(args[1], List.of("coins"));
         }
 
         if (args.length == 3 && args[0].equalsIgnoreCase("admin")
@@ -678,19 +645,9 @@ public final class DungeonHeroCommand implements TabExecutor {
             return complete(args[2], List.of("set", "add", "take"));
         }
 
-        if (args.length == 3 && args[0].equalsIgnoreCase("admin")
-                && args[1].equalsIgnoreCase("reputation")) {
-            return complete(args[2], List.of("set", "add"));
-        }
-
         if (args.length == 4 && args[0].equalsIgnoreCase("admin")
                 && args[1].equalsIgnoreCase("coins")) {
             return complete(args[3], Bukkit.getOnlinePlayers().stream().map(Player::getName).toList());
-        }
-
-        if (args.length == 2 && (args[0].equalsIgnoreCase("reputation")
-                || args[0].equalsIgnoreCase("rep"))) {
-            return complete(args[1], List.of("top", "contract"));
         }
 
         if (args.length == 3 && args[0].equalsIgnoreCase("give")

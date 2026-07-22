@@ -1,6 +1,7 @@
 package com.dungeonhero.feature.sword;
 
 import com.dungeonhero.feature.rank.DungeonRankService;
+import com.dungeonhero.feature.mobregistry.MobRegistryService;
 import com.dungeonhero.messaging.DungeonHeroMessages;
 import io.lumine.mythic.bukkit.events.MythicMobDeathEvent;
 
@@ -20,38 +21,23 @@ import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.HashSet;
-import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
 public final class SwordProgressionService implements Listener {
-
-    private static final Set<String> RARE_BOSS_IDS = Set.of(
-            "DH_VERDANTSOVEREIGN", "DH_SANDSTORMTYRANT", "DH_MIRESOVEREIGN",
-            "DH_WINTERCOLOSSUS", "DH_OVERGROWNTITAN", "DH_ABYSSALEMPEROR",
-            "DH_PALEHEARTREAPER", "DH_DEEPSTONEOVERLORD", "DW_CRYPTLORD");
-    private static final Set<String> MINIBOSS_IDS = Set.of(
-            "DH_BRIARMATRIARCH", "DH_SUNKENPHARAOH", "DH_BOGWITCHQUEEN", "DH_FROSTBOUNDGOLIATH",
-            "DH_TEMPLEOVERLORD", "DH_OCEANICLEVIATHAN", "DH_PALEGARDENWARDEN", "DH_DEEPSTONEBEHEMOTH");
-    private static final Set<String> ELITE_IDS = Set.of(
-            "DH_HEARTWOODBRUTE", "DH_DUNECOLOSSUS",
-            "DH_MIREABOMINATION", "DH_GLACIERRAVAGER", "DH_JADEBACKSENTINEL",
-            "DH_ABYSSALLEVIATHAN", "DH_MANORRELICKEEPER", "DH_CAVERNTYRANT", "DW_SOULREAVER");
 
     private final JavaPlugin plugin;
     private final HeroItemService heroItemService;
     private final SwordXpItemService swordXpItemService;
     private final DungeonRankService dungeonRankService;
     private final HeroSwordStorage heroSwordStorage;
+    private final MobRegistryService mobRegistryService;
 
     private boolean autoMobKillXp;
     private boolean hostileMobKillXpOnly;
     private int xpPerItem;
     private int xpPerMobKill;
     private int mythicMobXp;
-    private int eliteXp;
-    private int minibossXp;
-    private int rareBossXp;
     private int baseXpRequired;
     private double xpRequiredMultiplier;
     private int maxSwordLevel;
@@ -60,12 +46,14 @@ public final class SwordProgressionService implements Listener {
     public SwordProgressionService(JavaPlugin plugin, HeroItemService heroItemService,
                                    SwordXpItemService swordXpItemService,
                                    DungeonRankService dungeonRankService,
-                                   HeroSwordStorage heroSwordStorage) {
+                                   HeroSwordStorage heroSwordStorage,
+                                   MobRegistryService mobRegistryService) {
         this.plugin = plugin;
         this.heroItemService = heroItemService;
         this.swordXpItemService = swordXpItemService;
         this.dungeonRankService = dungeonRankService;
         this.heroSwordStorage = heroSwordStorage;
+        this.mobRegistryService = mobRegistryService;
         reload();
     }
 
@@ -80,12 +68,6 @@ public final class SwordProgressionService implements Listener {
                 "DungeonHero.Progression.XPPerMobKill", xpPerItem));
         mythicMobXp = Math.max(1, plugin.getConfig().getInt(
                 "DungeonHero.Progression.MythicMobXP", 25));
-        eliteXp = Math.max(mythicMobXp, plugin.getConfig().getInt(
-                "DungeonHero.Progression.EliteXP", 100));
-        minibossXp = Math.max(eliteXp, plugin.getConfig().getInt(
-                "DungeonHero.Progression.MinibossXP", 400));
-        rareBossXp = Math.max(minibossXp, plugin.getConfig().getInt(
-                "DungeonHero.Progression.RareBossXP", 1000));
         baseXpRequired = Math.max(1, plugin.getConfig().getInt(
                 "DungeonHero.Progression.BaseXPRequired", 100));
         xpRequiredMultiplier = Math.max(1.0, plugin.getConfig().getDouble(
@@ -167,21 +149,17 @@ public final class SwordProgressionService implements Listener {
                 playerLevelCap));
     }
 
+    /** Awards progression XP from a completed DungeonHero quest. */
+    public void awardQuestExperience(Player player, int amount) {
+        awardExperience(player, amount);
+    }
+
     private int mythicXpFor(String internalName) {
-        String id = internalName == null ? "" : internalName.toUpperCase(Locale.ROOT);
-        if (id.isBlank() || (!id.startsWith("DH_") && !id.startsWith("DW_"))) {
-            return 0;
+        if (mobRegistryService.find(internalName).isPresent()) {
+            return mobRegistryService.profileOrDefault(internalName).swordXp();
         }
-        if (RARE_BOSS_IDS.contains(id)) {
-            return rareBossXp;
-        }
-        if (MINIBOSS_IDS.contains(id)) {
-            return minibossXp;
-        }
-        if (ELITE_IDS.contains(id)) {
-            return eliteXp;
-        }
-        return mythicMobXp;
+        String id = internalName == null ? "" : internalName.trim().toUpperCase(java.util.Locale.ROOT);
+        return id.startsWith("DH_") || id.startsWith("DW_") ? mythicMobXp : 0;
     }
 
     private boolean isActiveMythicMob(UUID entityId) {
