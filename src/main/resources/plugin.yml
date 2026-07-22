@@ -9,7 +9,7 @@ depend: [MythicMobs]
 commands:
   dungeonhero:
     description: Shows DungeonHero status and opens the Hero Forge.
-    usage: /dungeonhero [help|reload|forge|give|give-xp|sword|rank|rankup|balance|transfer|quest|party|prestige|dummy|version]
+    usage: /dungeonhero [help|reload|forge|give|give-xp|sword|rank|rankup|balance|transfer|quest|party|prestige|dummy|admin|version]
     aliases: [dh]
 permissions:
   dungeonhero.admin:
@@ -21,6 +21,7 @@ permissions:
       dungeonhero.admin.coins: true
       dungeonhero.admin.dummy.remove: true
       dungeonhero.admin.dummy.remove-all: true
+      dungeonhero.admin.resetsword: true
   dungeonhero.admin.reload:
     description: Allows reloading DungeonHero configuration.
     default: false
@@ -35,6 +36,9 @@ permissions:
     default: false
   dungeonhero.admin.dummy.remove-all:
     description: Allows removing all DungeonHero Training Dummies from loaded worlds.
+    default: false
+  dungeonhero.admin.resetsword:
+    description: Allows previewing and resetting a player's Hero Sword.
     default: false
   dungeonhero.coins.balance:
     description: Allows viewing your Dungeon Coin balance.

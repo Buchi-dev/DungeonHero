@@ -213,11 +213,11 @@ DungeonHero:
     RequireSameWorld: true
     InvitationSeconds: 60
   MobScaling:
-    PartyMode: AVERAGE
+    PartyScalingMode: HIGHEST
     MaxPlayers: 5
 ```
 
-Use `/dh party help` for all commands. When a MythicMob spawns near a party member, DungeonHero scales it using the nearby members of that party. `AVERAGE` is recommended so one highly progressed player does not make the dungeon unfair for newer friends. Sword XP and Dungeon Coin balances remain personal; shared dungeon-completion rewards can be added once a dungeon completion event is connected.
+Use `/dh party help` for all commands. When a MythicMob spawns near a party member, DungeonHero scales it from the highest active Sword Level in that party, so a low-level member cannot reduce encounter difficulty. Sword XP and Dungeon Coin balances remain personal; shared dungeon-completion rewards can be added once a dungeon completion event is connected.
 
 ## Dungeon Coins and ranks
 
@@ -265,22 +265,28 @@ DungeonHero:
     Worlds:
       - dungeon_world
     SearchRadius: 32
-    PartyMode: AVERAGE
+    MobLevelSource: EFFECTIVE_SWORD_LEVEL
+    PartyScalingMode: HIGHEST
     MaxPlayers: 5
-    BaseLevel: 1
-    SwordLevelsPerMobLevel: 3.25
-    RankPowerBonus: 0.75
-    DamageBonusWeight: 0.12
-    PrestigeLevelBonus: 0.0
-    MaxLevel: 50
+    MaximumMobLevel: 104
     LevelOffsets:
-      Elite: 3
-      Miniboss: 6
-      RareBoss: 8
+      Normal: {Min: -2, Max: 4}
+      Elite: {Min: 0, Max: 4}
+      Miniboss: {Min: 1, Max: 4}
+      RareBoss: {Min: 2, Max: 4}
+  MobHp:
+    NormalBase: 400
+    NormalHpPerLevel: 40
+    ProfileMultipliers: {Normal: 1.0, Elite: 3.0, Miniboss: 8.0, RareBoss: 18.0}
+    MinimumAttacks: {Normal: 6, Elite: 12, Miniboss: 25, RareBoss: 50}
+    MaximumAmplifierCompensation: 0.50
 ```
 
-`PartyMode` can be `NEAREST`, `AVERAGE`, or `MAX`. MythicMobs then applies the
-mob's own `LevelModifiers` for health, damage, armor, and other stats.
+Mob levels are selected once at spawn from the effective Sword Level (including
+the prestige floor `1 + Prestige * 20`) and the profile offset range. MythicMobs
+then applies the mob's own `LevelModifiers` for health, damage, armor, and other
+stats. DungeonHero additionally applies the configured HP formula and bounded
+damage-based attack floor once at creation.
 
 ### MythicMob registry
 
@@ -314,14 +320,25 @@ YAML mapping. Unknown `DH_` and `DW_` IDs safely use the normal Mythic profile
 when prefix tracking is enabled.
 
 When `MobScaling.Worlds` is configured, only MythicMobs spawning in those worlds
-is scaled. `RankPowerBonus` adds direct Dungeon Rank power using
-`(Dungeon Rank - 1) * RankPowerBonus`, so Rank affects mobs even before the sword
-reaches its new rank cap. The default setup enables scaling only in
-`dungeon_world` with a `RankPowerBonus` of 2.
+is scaled. The selected level is also written to DungeonHero persistent metadata
+on the spawned entity, so it is not rerolled during combat. The default setup
+enables scaling only in `dungeon_world` and clamps levels to 104.
 
-Prestige is available when the sword reaches its current rank's maximum level.
-It preserves fragment Damage Bonus, increases Prestige by one, and resets the
-sword to Level 1 and the Wood tier.
+Hero Ascension is available at Sword Level 100, up to Prestige 5. `/dh prestige`
+opens a confirmation flow; `/dh prestige confirm` performs the atomic reset to
+Level 1 while preserving fragments, rank, dungeon access, and Dungeon Coins.
+Each Prestige player receives a single configured 2x Sword XP multiplier (not
+2^Prestige), and rare-drop bonuses follow the configured Prestige table.
+
+Administrators can inspect and reset a player's physical sword without deleting
+it:
+
+```text
+/dh admin resetsword <player> preview
+/dh admin resetsword <player> confirm
+```
+
+The command requires `dungeonhero.admin.resetsword` and writes an audit entry.
 
 ## Sword XP
 

@@ -80,6 +80,13 @@ public final class DungeonRankService {
         return Math.min(configuredCap, getCurrentRank(player).swordLevelCap());
     }
 
+    /** Revalidates permanent unlocked access without downgrading a player's stored rank. */
+    public int recalculateRank(Player player) {
+        int current = getRank(player);
+        player.getPersistentDataContainer().set(rankKey, PersistentDataType.INTEGER, current);
+        return current;
+    }
+
     public long getBalance(Player player) {
         return coinService.getBalance(player.getUniqueId());
     }

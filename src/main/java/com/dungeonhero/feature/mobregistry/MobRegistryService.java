@@ -127,7 +127,8 @@ public final class MobRegistryService {
     private MobProfile readProfile(String name, ConfigurationSection section, MobProfile fallback) {
         return new MobProfile(name,
                 Math.max(0, section.getInt("LevelOffset", fallback.levelOffset())),
-                Math.max(0, section.getInt("SwordXP", fallback.swordXp())));
+                Math.max(0, section.getInt("SwordXP", fallback.swordXp())),
+                section.getString("MobType", fallback.kind().name()));
     }
 
     private int levelOffset(String profile, int fallback) {
@@ -154,11 +155,20 @@ public final class MobRegistryService {
         return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
     }
 
-    public record MobProfile(String name, int levelOffset, int swordXp) {
+    public record MobProfile(String name, int levelOffset, int swordXp, String mobType) {
+        public MobProfile(String name, int levelOffset, int swordXp) {
+            this(name, levelOffset, swordXp, name);
+        }
+
         public MobProfile {
             name = name == null || name.isBlank() ? "custom" : name.trim().toLowerCase(Locale.ROOT);
             levelOffset = Math.max(0, levelOffset);
             swordXp = Math.max(0, swordXp);
+            mobType = mobType == null || mobType.isBlank() ? name : mobType.trim();
+        }
+
+        public com.dungeonhero.integration.mythicmobs.MobCombatBalance.MobKind kind() {
+            return com.dungeonhero.integration.mythicmobs.MobCombatBalance.MobKind.from(mobType);
         }
     }
 }

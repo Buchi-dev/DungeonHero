@@ -1,5 +1,6 @@
 package com.dungeonhero.feature.sword;
 
+import com.dungeonhero.feature.rank.DungeonRankService;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -21,12 +22,15 @@ public final class HeroPlayerListener implements Listener {
     private final JavaPlugin plugin;
     private final HeroItemService heroItemService;
     private final HeroSwordStorage heroSwordStorage;
+    private final DungeonRankService dungeonRankService;
     private final Map<UUID, ItemStack> swordsToRestore = new HashMap<>();
 
-    public HeroPlayerListener(JavaPlugin plugin, HeroItemService heroItemService, HeroSwordStorage heroSwordStorage) {
+    public HeroPlayerListener(JavaPlugin plugin, HeroItemService heroItemService, HeroSwordStorage heroSwordStorage,
+                              DungeonRankService dungeonRankService) {
         this.plugin = plugin;
         this.heroItemService = heroItemService;
         this.heroSwordStorage = heroSwordStorage;
+        this.dungeonRankService = dungeonRankService;
     }
 
     @EventHandler
@@ -101,7 +105,8 @@ public final class HeroPlayerListener implements Listener {
         if (bestSword == null) {
             bestSword = heroItemService.createHeroSword();
         } else {
-            bestSword = heroItemService.normalizeSword(bestSword);
+            bestSword = heroItemService.withFragmentRank(
+                    heroItemService.normalizeSword(bestSword), dungeonRankService.getRank(player));
         }
 
         Map<Integer, ItemStack> leftovers = inventory.addItem(bestSword);

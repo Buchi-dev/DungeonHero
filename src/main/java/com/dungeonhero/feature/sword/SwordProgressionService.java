@@ -131,6 +131,7 @@ public final class SwordProgressionService implements Listener {
         }
 
         ItemStack sword = inventory.getItem(swordSlot);
+        amount = scaledRewardExperience(sword, amount);
         int playerLevelCap = getMaxSwordLevel(player);
         if (heroItemService.getSwordLevel(sword) >= playerLevelCap) {
             player.sendActionBar(Component.text("Your Hero Sword has reached the level cap.",
@@ -147,6 +148,17 @@ public final class SwordProgressionService implements Listener {
         }
         player.sendActionBar(DungeonHeroMessages.compactSwordActionBar(result.sword(), heroItemService, this,
                 playerLevelCap));
+    }
+
+    /** Prestige grants one configured 2x reward multiplier, never 2^prestige. */
+    public int scaledRewardExperience(ItemStack sword, int amount) {
+        if (!heroItemService.isHeroSword(sword)) {
+            return Math.max(0, amount);
+        }
+        int prestige = heroItemService.getSwordPrestige(sword);
+        double multiplier = prestige > 0 ? Math.max(1, Math.min(2,
+                plugin.getConfig().getDouble("DungeonHero.HeroAscension.XpMultiplier", 2.0))) : 1.0;
+        return (int) Math.max(0, Math.round(Math.max(0, amount) * multiplier));
     }
 
     /** Awards progression XP from a completed DungeonHero quest. */
@@ -194,6 +206,7 @@ public final class SwordProgressionService implements Listener {
 
         int xpAmount = event.getItem().getItemStack().getAmount()
                 * swordXpItemService.getXpAmount(event.getItem().getItemStack());
+        xpAmount = scaledRewardExperience(sword, xpAmount);
         ProgressionResult result = addExperience(sword, xpAmount, playerLevelCap);
         inventory.setItem(swordSlot, result.sword());
         heroSwordStorage.save(player, result.sword());

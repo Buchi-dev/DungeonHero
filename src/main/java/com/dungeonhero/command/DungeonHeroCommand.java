@@ -9,12 +9,14 @@ import com.dungeonhero.feature.mobregistry.MobRegistryService;
 import com.dungeonhero.feature.sword.HeroItemService;
 import com.dungeonhero.feature.sword.HeroPlayerListener;
 import com.dungeonhero.feature.sword.HeroSwordStorage;
+import com.dungeonhero.feature.sword.HeroAscensionService;
 import com.dungeonhero.feature.sword.SwordHudService;
 import com.dungeonhero.feature.sword.SwordProgressionService;
 import com.dungeonhero.feature.sword.SwordXpItemService;
 import com.dungeonhero.feature.trainingdummy.TrainingDummyService;
 import com.dungeonhero.integration.mythicmobs.HeroSwordMobScaler;
 import com.dungeonhero.integration.mythicmobs.MythicFragmentService;
+import com.dungeonhero.integration.mythicmobs.HeroRareDropBonusListener;
 import com.dungeonhero.messaging.DungeonHeroMessages;
 import com.dungeonhero.messaging.MessageService;
 import com.dungeonhero.framework.GameplayFramework;
@@ -68,6 +70,8 @@ public final class DungeonHeroCommand implements TabExecutor {
     private final MobRegistryService mobRegistryService;
     private final GameplayFramework gameplayFramework;
     private final DungeonRushService dungeonRushService;
+    private final HeroAscensionService heroAscensionService;
+    private final HeroRareDropBonusListener rareDropBonusListener;
 
     public DungeonHeroCommand(JavaPlugin plugin,
                               HeroItemService heroItemService,
@@ -85,8 +89,10 @@ public final class DungeonHeroCommand implements TabExecutor {
                               MessageService messageService,
                               DungeonCoinService dungeonCoinService,
                               MobRegistryService mobRegistryService,
-                              GameplayFramework gameplayFramework,
-                              DungeonRushService dungeonRushService) {
+                               GameplayFramework gameplayFramework,
+                               DungeonRushService dungeonRushService,
+                               HeroAscensionService heroAscensionService,
+                               HeroRareDropBonusListener rareDropBonusListener) {
         this.plugin = plugin;
         this.heroItemService = heroItemService;
         this.heroSwordStorage = heroSwordStorage;
@@ -105,6 +111,8 @@ public final class DungeonHeroCommand implements TabExecutor {
         this.mobRegistryService = mobRegistryService;
         this.gameplayFramework = gameplayFramework;
         this.dungeonRushService = dungeonRushService;
+        this.heroAscensionService = heroAscensionService;
+        this.rareDropBonusListener = rareDropBonusListener;
     }
 
     @Override
@@ -185,7 +193,7 @@ public final class DungeonHeroCommand implements TabExecutor {
         }
 
         if (args[0].equalsIgnoreCase("prestige")) {
-            prestige(sender);
+            prestige(sender, args);
             return true;
         }
 
@@ -230,6 +238,8 @@ public final class DungeonHeroCommand implements TabExecutor {
         trainingDummyService.reload();
         dungeonCoinService.reload();
         dungeonRushService.reload();
+        heroAscensionService.reload();
+        rareDropBonusListener.reload();
         gameplayFramework.reload(plugin.getConfig().getConfigurationSection("DungeonHero.Gameplay.Features"));
         sender.sendMessage(messageService.text("command.reload_complete",
                 "DungeonHero configuration reloaded. Use /mm reload for MythicMobs changes.")
@@ -380,6 +390,10 @@ public final class DungeonHeroCommand implements TabExecutor {
     }
 
     private void handleAdmin(CommandSender sender, String[] args) {
+        if (args.length >= 2 && args[1].equalsIgnoreCase("resetsword")) {
+            handleSwordReset(sender, args);
+            return;
+        }
         if (args.length < 2 || !args[1].equalsIgnoreCase("coins")) {
             sender.sendMessage(Component.text(
                     "Usage: /dh admin coins [set|add|take] <player> <amount>", NamedTextColor.YELLOW));
@@ -422,6 +436,45 @@ public final class DungeonHeroCommand implements TabExecutor {
         sender.sendMessage(Component.text("Updated " + targetName + " to "
                 + dungeonCoinService.format(dungeonCoinService.getBalance(target.getUniqueId()))
                 + " Dungeon Coins.", NamedTextColor.GREEN));
+    }
+
+    private void handleSwordReset(CommandSender sender, String[] args) {
+        String permission = plugin.getConfig().getString("DungeonHero.Admin.ResetSwordPermission",
+                "dungeonhero.admin.resetsword");
+        if (!requirePermission(sender, permission)) {
+            return;
+        }
+        if (args.length != 4 || (!args[3].equalsIgnoreCase("preview")
+                && !args[3].equalsIgnoreCase("confirm"))) {
+            sender.sendMessage(Component.text(
+                    "Usage: /dh admin resetsword <player> [preview|confirm]", NamedTextColor.YELLOW));
+            return;
+        }
+        Player target = Bukkit.getPlayerExact(args[2]);
+        if (target == null) {
+            sender.sendMessage(Component.text("The target player must be online for a safe atomic reset.",
+                    NamedTextColor.RED));
+            return;
+        }
+        if (args[3].equalsIgnoreCase("preview")) {
+            var snapshot = heroAscensionService.previewReset(target);
+            sender.sendMessage(Component.text("Hero Sword reset preview for " + target.getName() + ": "
+                    + "Level " + snapshot.currentLevel() + " -> " + snapshot.resultingLevel()
+                    + ", XP " + snapshot.currentXp() + " -> " + snapshot.resultingXp()
+                    + ", Prestige " + snapshot.currentPrestige() + " -> " + snapshot.resultingPrestige()
+                    + ", Fragment Damage +" + formatNumber(snapshot.currentDamage()) + " -> +0"
+                    + ", Rank " + snapshot.currentRank() + " -> " + snapshot.resultingRank()
+                    + ", Coins preserved: " + snapshot.coins(), NamedTextColor.YELLOW));
+            return;
+        }
+        var result = heroAscensionService.resetSword(target, sender.getName());
+        if (result.status() == HeroAscensionService.ResetStatus.RESET) {
+            sender.sendMessage(Component.text("Hero Sword reset completed for " + target.getName() + ".",
+                    NamedTextColor.GREEN));
+        } else {
+            sender.sendMessage(Component.text("Hero Sword reset could not be completed: "
+                    + result.status(), NamedTextColor.RED));
+        }
     }
 
     private OfflinePlayer findOfflinePlayer(CommandSender sender, String name) {
@@ -479,46 +532,38 @@ public final class DungeonHeroCommand implements TabExecutor {
         }
     }
 
-    private void prestige(CommandSender sender) {
+    private void prestige(CommandSender sender, String[] args) {
         if (!(sender instanceof Player player)) {
             sender.sendMessage(Component.text("Only players can prestige a Hero Sword.", NamedTextColor.RED));
             return;
         }
 
-        int swordSlot = swordProgressionService.findStrongestSwordSlot(player.getInventory());
-        if (swordSlot < 0) {
-            player.sendMessage(Component.text("You do not have a Hero Sword.", NamedTextColor.RED));
-            return;
+        boolean confirm = args.length >= 2 && args[1].equalsIgnoreCase("confirm");
+        // /dh prestige confirm is deliberately explicit to prevent accidental activation.
+        // The caller passes the raw command arguments through this small stateful branch.
+        // (The no-argument form only creates the pending confirmation.)
+        HeroAscensionService.AscensionResult result = confirm
+                ? heroAscensionService.confirm(player) : heroAscensionService.request(player);
+        switch (result) {
+            case CONFIRMATION_REQUIRED -> player.sendMessage(Component.text(
+                    "Hero Ascension will reset your sword to Level 1 and preserve rank, coins, and fragments. "
+                            + "Run /dh prestige confirm within 30 seconds to continue.", NamedTextColor.YELLOW));
+            case ASCENDED -> player.sendMessage(Component.text(
+                    "Hero Ascension complete. You are now Prestige " + (heroItemService.getSwordPrestige(
+                            heroItemService.findStrongestHeroSword(player))) + ".", NamedTextColor.LIGHT_PURPLE));
+            case NO_SWORD -> player.sendMessage(Component.text("You do not have a Hero Sword.", NamedTextColor.RED));
+            case LEVEL_REQUIRED -> player.sendMessage(Component.text(
+                    "Reach Sword Level " + heroAscensionService.requiredLevel() + " before Hero Ascension.", NamedTextColor.YELLOW));
+            case MAX_PRESTIGE -> player.sendMessage(Component.text("Your Hero Sword has reached the Prestige cap of "
+                    + heroAscensionService.maxPrestige() + ".", NamedTextColor.YELLOW));
+            case DISABLED -> player.sendMessage(Component.text("Hero Ascension is currently disabled.", NamedTextColor.YELLOW));
+            case STORAGE_FAILURE -> player.sendMessage(Component.text("Hero Ascension could not be saved and was rolled back.", NamedTextColor.RED));
         }
+    }
 
-        var sword = player.getInventory().getItem(swordSlot);
-        int swordLevelCap = swordProgressionService.getMaxSwordLevel(player);
-        if (heroItemService.getSwordLevel(sword) < swordLevelCap) {
-            player.sendMessage(Component.text(
-                    "Reach Sword Level " + swordLevelCap + " before prestiging.",
-                    NamedTextColor.YELLOW));
-            return;
-        }
-
-        boolean prestigeEnabled = plugin.getConfig().getBoolean("DungeonHero.Progression.Prestige.Enabled", true);
-        int maxPrestige = Math.max(0, plugin.getConfig().getInt(
-                "DungeonHero.Progression.Prestige.MaxPrestige", 5));
-        int currentPrestige = heroItemService.getSwordPrestige(sword);
-        if (!prestigeEnabled) {
-            player.sendMessage(Component.text("Prestige is currently disabled in this dungeon.", NamedTextColor.YELLOW));
-            return;
-        }
-        if (currentPrestige >= maxPrestige) {
-            player.sendMessage(Component.text("Your Hero Sword has reached the Prestige cap of " + maxPrestige + ".",
-                    NamedTextColor.YELLOW));
-            return;
-        }
-        var prestigedSword = heroItemService.withPrestige(sword);
-        player.getInventory().setItem(swordSlot, prestigedSword);
-        heroSwordStorage.save(player, prestigedSword);
-        player.sendMessage(Component.text(
-                "Your Hero Sword is now Prestige " + heroItemService.getSwordPrestige(prestigedSword)
-                        + " and has reset to Level 1 (Wood tier).", NamedTextColor.LIGHT_PURPLE));
+    private String formatNumber(double value) {
+        return value == Math.rint(value) ? String.format(Locale.ROOT, "%.0f", value)
+                : String.format(Locale.ROOT, "%.2f", value);
     }
 
     private void handleParty(CommandSender sender, String[] args) {
@@ -637,7 +682,17 @@ public final class DungeonHeroCommand implements TabExecutor {
         }
 
         if (args.length == 2 && args[0].equalsIgnoreCase("admin")) {
-            return complete(args[1], List.of("coins"));
+            return complete(args[1], List.of("coins", "resetsword"));
+        }
+
+        if (args.length == 3 && args[0].equalsIgnoreCase("admin")
+                && args[1].equalsIgnoreCase("resetsword")) {
+            return complete(args[2], Bukkit.getOnlinePlayers().stream().map(Player::getName).toList());
+        }
+
+        if (args.length == 4 && args[0].equalsIgnoreCase("admin")
+                && args[1].equalsIgnoreCase("resetsword")) {
+            return complete(args[3], List.of("preview", "confirm"));
         }
 
         if (args.length == 3 && args[0].equalsIgnoreCase("admin")

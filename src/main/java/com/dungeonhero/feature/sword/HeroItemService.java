@@ -29,14 +29,24 @@ public final class HeroItemService {
     private final NamespacedKey swordXpKey;
     private final NamespacedKey swordTierKey;
     private final NamespacedKey prestigeKey;
+    private final NamespacedKey fragmentTotalKey;
+    private final NamespacedKey fragmentOverflowKey;
+    private final NamespacedKey fragmentRankKey;
+    private final JavaPlugin plugin;
+    private final FragmentDamagePolicy fragmentDamagePolicy;
 
     public HeroItemService(JavaPlugin plugin) {
+        this.plugin = plugin;
+        this.fragmentDamagePolicy = createFragmentDamagePolicy(plugin);
         heroSwordKey = new NamespacedKey(plugin, "hero_sword");
         damageBonusKey = new NamespacedKey(plugin, "damage_bonus");
         swordLevelKey = new NamespacedKey(plugin, "sword_level");
         swordXpKey = new NamespacedKey(plugin, "sword_xp");
         swordTierKey = new NamespacedKey(plugin, "sword_tier");
         prestigeKey = new NamespacedKey(plugin, "prestige");
+        fragmentTotalKey = new NamespacedKey(plugin, "fragment_damage_total");
+        fragmentOverflowKey = new NamespacedKey(plugin, "fragment_damage_overflow");
+        fragmentRankKey = new NamespacedKey(plugin, "fragment_damage_rank");
     }
 
     public ItemStack createHeroSword() {
@@ -49,7 +59,10 @@ public final class HeroItemService {
         data.set(swordXpKey, PersistentDataType.INTEGER, 0);
         data.set(swordTierKey, PersistentDataType.STRING, SwordTier.WOOD.name());
         data.set(prestigeKey, PersistentDataType.INTEGER, 0);
-        updateHeroSwordMeta(meta, 0.0D, SwordTier.WOOD, 0);
+        data.set(fragmentTotalKey, PersistentDataType.DOUBLE, 0.0D);
+        data.set(fragmentOverflowKey, PersistentDataType.DOUBLE, 0.0D);
+        data.set(fragmentRankKey, PersistentDataType.INTEGER, 1);
+        updateHeroSwordMeta(meta, 0.0D, SwordTier.WOOD, 0, 1);
         sword.setItemMeta(meta);
         return sword;
     }
@@ -68,18 +81,44 @@ public final class HeroItemService {
     }
 
     public double getDamageBonus(ItemStack sword) {
+        return getStoredDamageBonus(sword);
+    }
+
+    /** Returns the complete, safely decoded fragment total, including inactive overflow. */
+    public double getStoredDamageBonus(ItemStack sword) {
         if (!isHeroSword(sword)) {
             return 0;
         }
 
         PersistentDataContainer data = sword.getItemMeta().getPersistentDataContainer();
+        Double total = data.get(fragmentTotalKey, PersistentDataType.DOUBLE);
+        if (total != null) {
+            return fragmentDamagePolicy.sanitizeTotal(total);
+        }
         Double doubleBonus = data.get(damageBonusKey, PersistentDataType.DOUBLE);
         if (doubleBonus != null) {
-            return Math.max(0, doubleBonus);
+            return fragmentDamagePolicy.sanitizeTotal(doubleBonus);
         }
 
         Integer legacyBonus = data.get(damageBonusKey, PersistentDataType.INTEGER);
-        return legacyBonus == null ? 0 : Math.max(0, legacyBonus);
+        return legacyBonus == null ? 0 : fragmentDamagePolicy.sanitizeTotal(legacyBonus);
+    }
+
+    public double getEffectiveDamageBonus(ItemStack sword, int rank) {
+        return fragmentDamagePolicy.effective(getStoredDamageBonus(sword), rank);
+    }
+
+    public double getInactiveDamageBonus(ItemStack sword, int rank) {
+        return fragmentDamagePolicy.overflow(getStoredDamageBonus(sword), rank);
+    }
+
+    public int getFragmentRank(ItemStack sword) {
+        if (!isHeroSword(sword)) {
+            return 1;
+        }
+        Integer rank = sword.getItemMeta().getPersistentDataContainer()
+                .get(fragmentRankKey, PersistentDataType.INTEGER);
+        return rank == null ? 1 : Math.max(1, rank);
     }
 
     public int getSwordLevel(ItemStack sword) {
@@ -118,7 +157,7 @@ public final class HeroItemService {
             return sword;
         }
 
-        return withSwordState(sword, level, xp, getDamageBonus(sword), getSwordPrestige(sword));
+        return withSwordState(sword, level, xp, getStoredDamageBonus(sword), getSwordPrestige(sword));
     }
 
     private ItemStack withSwordState(ItemStack sword, int level, int xp, double damageBonus, int prestige) {
@@ -130,7 +169,7 @@ public final class HeroItemService {
         ItemMeta meta = updatedSword.getItemMeta();
         PersistentDataContainer data = meta.getPersistentDataContainer();
         int safeLevel = Math.max(1, level);
-        double safeDamageBonus = Math.max(0.0D, damageBonus);
+        double safeDamageBonus = safeDamage(damageBonus);
         int safePrestige = Math.max(0, prestige);
         SwordTier tier = SwordTier.fromLevel(safeLevel);
         data.set(swordLevelKey, PersistentDataType.INTEGER, safeLevel);
@@ -138,8 +177,12 @@ public final class HeroItemService {
         data.set(swordTierKey, PersistentDataType.STRING, tier.name());
         data.set(damageBonusKey, PersistentDataType.DOUBLE, safeDamageBonus);
         data.set(prestigeKey, PersistentDataType.INTEGER, safePrestige);
+        data.set(fragmentTotalKey, PersistentDataType.DOUBLE, safeDamageBonus);
+        int rank = getFragmentRank(sword);
+        data.set(fragmentRankKey, PersistentDataType.INTEGER, rank);
+        data.set(fragmentOverflowKey, PersistentDataType.DOUBLE, fragmentDamagePolicy.overflow(safeDamageBonus, rank));
         updatedSword.setType(tier.material());
-        updateHeroSwordMeta(meta, safeDamageBonus, tier, safePrestige);
+        updateHeroSwordMeta(meta, safeDamageBonus, tier, safePrestige, rank);
         updatedSword.setItemMeta(meta);
         return updatedSword;
     }
@@ -149,8 +192,8 @@ public final class HeroItemService {
             return sword;
         }
 
-        int prestige = getSwordPrestige(sword) + 1;
-        return withSwordState(sword, 1, 0, getDamageBonus(sword), prestige);
+        int prestige = Math.min(5, getSwordPrestige(sword) + 1);
+        return withSwordState(sword, 1, 0, getStoredDamageBonus(sword), prestige);
     }
 
     public ItemStack normalizeSword(ItemStack sword) {
@@ -158,6 +201,29 @@ public final class HeroItemService {
             return sword;
         }
         return withSwordProgression(sword, getSwordLevel(sword), getSwordXp(sword));
+    }
+
+    public ItemStack resetSword(ItemStack sword) {
+        return withSwordState(sword, 1, 0, 0, 0);
+    }
+
+    /** Refreshes the rank-dependent active/overflow display and server attribute. */
+    public ItemStack withFragmentRank(ItemStack sword, int rank) {
+        if (!isHeroSword(sword)) {
+            return sword;
+        }
+        ItemStack updated = sword.clone();
+        ItemMeta meta = updated.getItemMeta();
+        int safeRank = Math.max(1, rank);
+        double total = getStoredDamageBonus(sword);
+        meta.getPersistentDataContainer().set(fragmentTotalKey, PersistentDataType.DOUBLE, total);
+        meta.getPersistentDataContainer().set(damageBonusKey, PersistentDataType.DOUBLE, total);
+        meta.getPersistentDataContainer().set(fragmentRankKey, PersistentDataType.INTEGER, safeRank);
+        meta.getPersistentDataContainer().set(fragmentOverflowKey, PersistentDataType.DOUBLE,
+                getInactiveDamageBonus(sword, safeRank));
+        updateHeroSwordMeta(meta, total, getSwordTier(sword), getSwordPrestige(sword), safeRank);
+        updated.setItemMeta(meta);
+        return updated;
     }
 
     public ItemStack findStrongestHeroSword(Player player) {
@@ -185,11 +251,16 @@ public final class HeroItemService {
             throw new IllegalArgumentException("Forge quantity must be positive.");
         }
 
-        double newDamageBonus = getDamageBonus(sword) + (upgrade.amount() * quantity);
+        double newDamageBonus = safeDamage(getStoredDamageBonus(sword) + (upgrade.amount() * quantity));
         ItemStack upgradedSword = sword.clone();
         ItemMeta meta = upgradedSword.getItemMeta();
         meta.getPersistentDataContainer().set(damageBonusKey, PersistentDataType.DOUBLE, newDamageBonus);
-        updateHeroSwordMeta(meta, newDamageBonus, getSwordTier(upgradedSword), getSwordPrestige(upgradedSword));
+        meta.getPersistentDataContainer().set(fragmentTotalKey, PersistentDataType.DOUBLE, newDamageBonus);
+        int rank = getFragmentRank(sword);
+        meta.getPersistentDataContainer().set(fragmentRankKey, PersistentDataType.INTEGER, rank);
+        meta.getPersistentDataContainer().set(fragmentOverflowKey, PersistentDataType.DOUBLE,
+                Math.max(0, newDamageBonus - fragmentCap(rank)));
+        updateHeroSwordMeta(meta, newDamageBonus, getSwordTier(upgradedSword), getSwordPrestige(upgradedSword), rank);
         upgradedSword.setItemMeta(meta);
         return upgradedSword;
     }
@@ -200,7 +271,7 @@ public final class HeroItemService {
                 player.getWorld().dropItemNaturally(player.getLocation(), leftover));
     }
 
-    private void updateHeroSwordMeta(ItemMeta meta, double damageBonus, SwordTier tier, int prestige) {
+    private void updateHeroSwordMeta(ItemMeta meta, double damageBonus, SwordTier tier, int prestige, int rank) {
         meta.displayName(Component.text(tier.displayName() + " Hero Sword", tier.color())
                 .decoration(TextDecoration.ITALIC, false));
         meta.lore(List.of(
@@ -215,7 +286,9 @@ public final class HeroItemService {
                 Component.empty(),
                 Component.text("◆ POWER", NamedTextColor.DARK_AQUA)
                         .decoration(TextDecoration.BOLD, true),
-                loreLine("Damage Bonus", "+" + formatNumber(damageBonus), NamedTextColor.RED),
+                loreLine("Fragment Damage", "+" + formatNumber(damageBonus), NamedTextColor.RED),
+                loreLine("Effective Damage", "+" + formatNumber(Math.min(damageBonus, fragmentCap(rank))), NamedTextColor.GREEN),
+                loreLine("Inactive Overflow", "+" + formatNumber(Math.max(0, damageBonus - fragmentCap(rank))), NamedTextColor.GRAY),
                 loreLine("Prestige", String.valueOf(prestige), NamedTextColor.LIGHT_PURPLE),
                 Component.empty(),
                 Component.text("◆ FORGE", NamedTextColor.DARK_AQUA)
@@ -230,10 +303,11 @@ public final class HeroItemService {
         meta.setUnbreakable(true);
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
         meta.removeAttributeModifier(Attribute.ATTACK_DAMAGE);
-        if (damageBonus > 0) {
+        double effectiveDamage = Math.min(damageBonus, fragmentCap(rank));
+        if (effectiveDamage > 0) {
             meta.addAttributeModifier(
                     Attribute.ATTACK_DAMAGE,
-                    new AttributeModifier(damageBonusKey, damageBonus, AttributeModifier.Operation.ADD_NUMBER,
+                     new AttributeModifier(damageBonusKey, effectiveDamage, AttributeModifier.Operation.ADD_NUMBER,
                             EquipmentSlotGroup.MAINHAND)
             );
         }
@@ -274,5 +348,37 @@ public final class HeroItemService {
             return String.format(Locale.ROOT, "%.0f", value);
         }
         return String.format(Locale.ROOT, "%.2f", value);
+    }
+
+    private double fragmentCap(int rank) {
+        int safeRank = Math.max(1, rank);
+        double configured = plugin.getConfig().getDouble(
+                "DungeonHero.FragmentCaps.RankCaps." + safeRank, Double.NaN);
+        if (!Double.isFinite(configured)) {
+            configured = plugin.getConfig().getDouble("DungeonHero.Fragments.Caps." + safeRank, Double.NaN);
+        }
+        if (!Double.isFinite(configured)) {
+            configured = switch (safeRank) {
+                case 1 -> 10; case 2 -> 20; case 3 -> 35; case 4 -> 55; case 5 -> 80;
+                case 6 -> 110; case 7 -> 145; case 8 -> 185; case 9 -> 230; default -> 280;
+            };
+        }
+        return Math.max(0, configured);
+    }
+
+    private double safeDamage(double value) {
+        double max = Math.max(280, plugin.getConfig().getDouble(
+                "DungeonHero.FragmentCaps.MaximumStoredDamage", 100000));
+        return Math.max(0, Math.min(max, Double.isFinite(value) ? value : 0));
+    }
+
+    private FragmentDamagePolicy createFragmentDamagePolicy(JavaPlugin plugin) {
+        double[] caps = new double[11];
+        for (int rank = 1; rank <= 10; rank++) {
+            caps[rank] = plugin.getConfig().getDouble("DungeonHero.FragmentCaps.RankCaps." + rank,
+                    Double.NaN);
+        }
+        return new FragmentDamagePolicy(caps, plugin.getConfig().getDouble(
+                "DungeonHero.FragmentCaps.MaximumStoredDamage", 100000));
     }
 }

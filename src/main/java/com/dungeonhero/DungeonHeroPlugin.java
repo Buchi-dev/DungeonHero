@@ -9,6 +9,7 @@ import com.dungeonhero.feature.mobregistry.MobRegistryService;
 import com.dungeonhero.feature.sword.HeroItemService;
 import com.dungeonhero.feature.sword.HeroPlayerListener;
 import com.dungeonhero.feature.sword.HeroSwordStorage;
+import com.dungeonhero.feature.sword.HeroAscensionService;
 import com.dungeonhero.feature.sword.SwordHudService;
 import com.dungeonhero.feature.sword.SwordProgressionService;
 import com.dungeonhero.feature.sword.SwordXpItemService;
@@ -16,6 +17,8 @@ import com.dungeonhero.feature.trainingdummy.TrainingDummyService;
 import com.dungeonhero.feature.quest.DungeonRushService;
 import com.dungeonhero.integration.mythicmobs.HeroSwordMobScaler;
 import com.dungeonhero.integration.mythicmobs.MythicFragmentService;
+import com.dungeonhero.integration.mythicmobs.HeroDamageProtectionListener;
+import com.dungeonhero.integration.mythicmobs.HeroRareDropBonusListener;
 import com.dungeonhero.gui.GuiManager;
 import com.dungeonhero.messaging.MessageService;
 import com.dungeonhero.feature.openworlddungeon.OpenWorldDungeonFeature;
@@ -50,6 +53,8 @@ public final class DungeonHeroPlugin extends JavaPlugin {
         MythicFragmentService mythicFragmentService = new MythicFragmentService(this);
         DungeonCoinService dungeonCoinService = new DungeonCoinService(this);
         DungeonRankService dungeonRankService = new DungeonRankService(this, heroItemService, dungeonCoinService);
+        HeroAscensionService heroAscensionService = new HeroAscensionService(this, heroItemService,
+                heroSwordStorage, dungeonRankService);
         guiManager = new GuiManager();
         ForgeGui forgeGui = new ForgeGui(this, guiManager, heroItemService,
                 mythicFragmentService, heroSwordStorage);
@@ -62,13 +67,19 @@ public final class DungeonHeroPlugin extends JavaPlugin {
         HeroSwordMobScaler heroSwordMobScaler = new HeroSwordMobScaler(this, heroItemService, partyService,
                 dungeonRankService, mobRegistryService);
         SwordHudService swordHudService = new SwordHudService(this, heroItemService, swordProgressionService);
-        HeroPlayerListener heroPlayerListener = new HeroPlayerListener(this, heroItemService, heroSwordStorage);
+        HeroPlayerListener heroPlayerListener = new HeroPlayerListener(this, heroItemService, heroSwordStorage,
+                dungeonRankService);
         MessageService messageService = new MessageService(this);
 
         getServer().getPluginManager().registerEvents(heroPlayerListener, this);
         getServer().getPluginManager().registerEvents(guiManager, this);
         getServer().getPluginManager().registerEvents(swordProgressionService, this);
         getServer().getPluginManager().registerEvents(heroSwordMobScaler, this);
+        getServer().getPluginManager().registerEvents(
+                new HeroDamageProtectionListener(this, heroItemService, dungeonRankService), this);
+        HeroRareDropBonusListener rareDropBonusListener = new HeroRareDropBonusListener(this, heroAscensionService,
+                heroItemService, mythicFragmentService, mobRegistryService);
+        getServer().getPluginManager().registerEvents(rareDropBonusListener, this);
         getServer().getPluginManager().registerEvents(swordHudService, this);
         getServer().getPluginManager().registerEvents(partyService, this);
         getServer().getPluginManager().registerEvents(dungeonRushService, this);
@@ -83,7 +94,7 @@ public final class DungeonHeroPlugin extends JavaPlugin {
                 swordXpItemService, swordHudService, swordProgressionService, dungeonRankService, partyService,
                 trainingDummyService, forgeGui,
                 messageService, dungeonCoinService, mobRegistryService,
-                gameplayFramework, dungeonRushService);
+                gameplayFramework, dungeonRushService, heroAscensionService, rareDropBonusListener);
         if (getCommand("dungeonhero") != null) {
             getCommand("dungeonhero").setExecutor(command);
             getCommand("dungeonhero").setTabCompleter(command);

@@ -51,6 +51,35 @@ DungeonHero:
     Prestige:
       Enabled: true
       MaxPrestige: 5
+  HeroAscension:
+    Enabled: true
+    RequiredSwordLevel: 100
+    MaxPrestige: 5
+    ConfirmationSeconds: 30
+    XpMultiplier: 2.0
+    RareDropBonuses:
+      1: 0.10
+      2: 0.15
+      3: 0.20
+      4: 0.25
+      5: 0.30
+    # Only these configured mob drops can receive the bonus; guaranteed/admin rewards are not touched.
+    RareDropEligibleMaterials: []
+    RareDropEligibleMythicItems:
+      - mm:HeroDamageFragment
+  FragmentCaps:
+    MaximumStoredDamage: 100000
+    RankCaps:
+      1: 10
+      2: 20
+      3: 35
+      4: 55
+      5: 80
+      6: 110
+      7: 145
+      8: 185
+      9: 230
+      10: 280
   Ranks:
     CoinName: "Dungeon Coins"
     List:
@@ -112,19 +141,41 @@ DungeonHero:
     Worlds:
       - dungeon_world
     SearchRadius: 32
-    PartyMode: AVERAGE
+    MobLevelSource: EFFECTIVE_SWORD_LEVEL
+    PartyScalingMode: HIGHEST
+    PartyMode: HIGHEST
     MaxPlayers: 5
-    BaseLevel: 1
-    SwordLevelsPerMobLevel: 3.25
-    RankPowerBonus: 0.75
-    DamageBonusWeight: 0.12
-    PrestigeLevelBonus: 0.0
-    MaxLevel: 50
+    MaximumMobLevel: 104
+    MaxLevel: 104
     LevelOffsets:
-      Elite: 3
-      Miniboss: 6
-      RareBoss: 8
+      Normal: {Min: -2, Max: 4}
+      Elite: {Min: 0, Max: 4}
+      Miniboss: {Min: 1, Max: 4}
+      RareBoss: {Min: 2, Max: 4}
     Debug: false
+  MobHp:
+    NormalBase: 400
+    NormalHpPerLevel: 40
+    ProfileMultipliers:
+      Normal: 1.0
+      Elite: 3.0
+      Miniboss: 8.0
+      RareBoss: 18.0
+    MinimumAttacks:
+      Normal: 6
+      Elite: 12
+      Miniboss: 25
+      RareBoss: 50
+    MaximumAmplifierCompensation: 0.50
+    DamageAmplifierCompensationPerDamage: 0.005
+  DamageProtection:
+    CriticalDamageMultiplier: 4.0
+  DamageAmplifiers:
+    ApprovedPotionEffects:
+      - strength
+    PotionCompensationPerLevel: 0.02
+  Admin:
+    ResetSwordPermission: dungeonhero.admin.resetsword
   Party:
     Enabled: true
     MaxSize: 5
