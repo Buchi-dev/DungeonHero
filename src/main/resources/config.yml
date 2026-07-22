@@ -26,11 +26,77 @@ DungeonHero:
         Timers:
           completion-cooldown-seconds: 60
         Triggers: []
+      blood-arena:
+        Enabled: false
+        ConfigVersion: 1
+        ArenaWorld: dungeon_arenas
+        ArenaId: crypt_colosseum
+        # Coordinates point into a prebuilt, protected arena. No blocks are placed by DungeonHero.
+        PlayerSpawn:
+          X: 0
+          Y: 100
+          Z: 0
+          Yaw: 0
+          Pitch: 0
+        BossSpawn:
+          X: 0
+          Y: 100
+          Z: 0
+          Yaw: 180
+          Pitch: 0
+        TargetRadius: 24
+        MaximumPlayers: 5
+        DurationSeconds: 45
+        ReturnPlayersAfterFight: true
+        PreventTeleport: true
+        PreventPearls: true
+        Effects:
+          BoundaryParticle: REDSTONE
+          EntranceSound: ENTITY_WITHER_SPAWN
+          CombatSound: ENTITY_ENDER_DRAGON_GROWL
+        Phases:
+          - DelaySeconds: 10
+            Action: summon_reinforcements
+            Mob: Cryptling
+            Amount: 3
+          - DelaySeconds: 25
+            Action: apply_effect
+            Effect: DARKNESS
+            DurationSeconds: 5
+        Rewards:
+          RewardOnTimeout: false
+          Commands: []
   Fragments:
     "mm:HeroDamageFragment":
       Type: fragment
       Stat: DAMAGE
       Amount: 2
+    "mm:HeroArmorFragment":
+      Type: fragment
+      Stat: ARMOR
+      Amount: 1
+  Armor:
+    Enabled: true
+    MaxLevel: 100
+    LevelReductionPerLevel: 0.0015
+    MaxLevelReduction: 0.15
+    FragmentReductionPerPoint: 0.01
+    MaxFragmentReduction: 0.20
+    MaxTotalReduction: 0.40
+    LastStandHealthThreshold: 0.30
+    LastStandCooldownSeconds: 30
+    MaximumStoredArmor: 100000
+    RankCaps:
+      1: 10
+      2: 20
+      3: 35
+      4: 55
+      5: 80
+      6: 110
+      7: 145
+      8: 185
+      9: 230
+      10: 280
   Progression:
     SwordXPItem:
       Material: EXPERIENCE_BOTTLE
@@ -84,51 +150,61 @@ DungeonHero:
         Name: Novice
         RequiredSwordLevel: 1
         SwordLevelCap: 10
+        ArmorLevelCap: 10
         Cost: 0
       "2":
         Name: Apprentice
         RequiredSwordLevel: 10
         SwordLevelCap: 20
+        ArmorLevelCap: 20
         Cost: 100
       "3":
         Name: Adventurer
         RequiredSwordLevel: 20
         SwordLevelCap: 30
+        ArmorLevelCap: 30
         Cost: 250
       "4":
         Name: Warrior
         RequiredSwordLevel: 30
         SwordLevelCap: 40
+        ArmorLevelCap: 40
         Cost: 500
       "5":
         Name: Elite
         RequiredSwordLevel: 40
         SwordLevelCap: 50
+        ArmorLevelCap: 50
         Cost: 1000
       "6":
         Name: Champion
         RequiredSwordLevel: 50
         SwordLevelCap: 60
+        ArmorLevelCap: 60
         Cost: 2000
       "7":
         Name: Master
         RequiredSwordLevel: 60
         SwordLevelCap: 70
+        ArmorLevelCap: 70
         Cost: 4000
       "8":
         Name: Grandmaster
         RequiredSwordLevel: 70
         SwordLevelCap: 80
+        ArmorLevelCap: 80
         Cost: 8000
       "9":
         Name: Legend
         RequiredSwordLevel: 80
         SwordLevelCap: 90
+        ArmorLevelCap: 90
         Cost: 16000
       "10":
         Name: Hero
         RequiredSwordLevel: 90
         SwordLevelCap: 100
+        ArmorLevelCap: 100
         Cost: 32000
   Hud:
     UseVanillaXpBar: true

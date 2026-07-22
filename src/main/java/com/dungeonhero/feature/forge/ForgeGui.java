@@ -1,5 +1,6 @@
 package com.dungeonhero.feature.forge;
 
+import com.dungeonhero.feature.armor.HeroArmorService;
 import com.dungeonhero.feature.sword.HeroItemService;
 import com.dungeonhero.feature.sword.HeroSwordStorage;
 import com.dungeonhero.gui.GuiManager;
@@ -39,6 +40,7 @@ public final class ForgeGui implements GuiManager.Screen {
   private final HeroItemService heroItemService;
   private final MythicFragmentService mythicFragmentService;
   private final HeroSwordStorage heroSwordStorage;
+  private final HeroArmorService heroArmorService;
   private Player player;
   private Inventory inventory;
   private int batchAmount = 1;
@@ -50,16 +52,33 @@ public final class ForgeGui implements GuiManager.Screen {
       HeroItemService heroItemService,
       MythicFragmentService mythicFragmentService,
       HeroSwordStorage heroSwordStorage) {
+    this(plugin, guiManager, heroItemService, mythicFragmentService, heroSwordStorage, null);
+  }
+
+  public ForgeGui(
+      JavaPlugin plugin,
+      GuiManager guiManager,
+      HeroItemService heroItemService,
+      MythicFragmentService mythicFragmentService,
+      HeroSwordStorage heroSwordStorage,
+      HeroArmorService heroArmorService) {
     this.plugin = plugin;
     this.guiManager = guiManager;
     this.heroItemService = heroItemService;
     this.mythicFragmentService = mythicFragmentService;
     this.heroSwordStorage = heroSwordStorage;
+    this.heroArmorService = heroArmorService;
   }
 
   public void open(Player player) {
     ForgeGui session =
-        new ForgeGui(plugin, guiManager, heroItemService, mythicFragmentService, heroSwordStorage);
+        new ForgeGui(
+            plugin,
+            guiManager,
+            heroItemService,
+            mythicFragmentService,
+            heroSwordStorage,
+            heroArmorService);
     guiManager.open(
         player, GUI_ROWS, Component.text("Hero Forge", NamedTextColor.DARK_PURPLE), session);
   }
@@ -134,9 +153,9 @@ public final class ForgeGui implements GuiManager.Screen {
   }
 
   private void forge() {
-    ItemStack sword = inventory.getItem(SWORD_SLOT);
+    ItemStack target = inventory.getItem(SWORD_SLOT);
     ItemStack fragment = inventory.getItem(FRAGMENT_SLOT);
-    MythicFragmentService.Inspection inspection = inspect(sword, fragment);
+    MythicFragmentService.Inspection inspection = inspect(target, fragment);
     if (!inspection.isValid()) {
       player.sendMessage(Component.text(inspection.error(), NamedTextColor.RED));
       refresh();
@@ -145,21 +164,32 @@ public final class ForgeGui implements GuiManager.Screen {
 
     int available = fragment.getAmount();
     int quantity = Math.max(1, Math.min(batchAmount, available));
-    ItemStack upgradedSword = heroItemService.forge(sword, inspection.upgrade(), quantity);
-    inventory.setItem(SWORD_SLOT, upgradedSword);
+    boolean armor = heroArmorService != null && heroArmorService.isHeroArmor(target);
+    ItemStack upgraded =
+        armor
+            ? heroArmorService.forge(target, inspection.upgrade(), quantity)
+            : heroItemService.forge(target, inspection.upgrade(), quantity);
+    inventory.setItem(SWORD_SLOT, upgraded);
     if (available > quantity) {
       fragment.setAmount(available - quantity);
       inventory.setItem(FRAGMENT_SLOT, fragment);
     } else {
       inventory.setItem(FRAGMENT_SLOT, null);
     }
-    heroSwordStorage.save(player, upgradedSword);
+    if (armor) {
+      heroArmorService.save(player, heroArmorService.getState(upgraded));
+      heroArmorService.syncPlayerItems(player, heroArmorService.getState(upgraded));
+    } else {
+      heroSwordStorage.save(player, upgraded);
+    }
     batchAmount = 1;
     refresh();
 
     player.sendMessage(
         Component.text(
-            "The Hero Sword grew stronger: x"
+            "The "
+                + (armor ? "Hero Armor" : "Hero Sword")
+                + " grew stronger: x"
                 + quantity
                 + " forge, +"
                 + formatNumber(inspection.upgrade().amount() * quantity)
@@ -170,15 +200,32 @@ public final class ForgeGui implements GuiManager.Screen {
     player.playSound(player.getLocation(), "block.anvil.use", 1.0f, 1.0f);
   }
 
-  private MythicFragmentService.Inspection inspect(ItemStack sword, ItemStack fragment) {
-    if (sword == null || sword.getAmount() != 1 || !heroItemService.isHeroSword(sword)) {
-      return MythicFragmentService.Inspection.invalid("Place one Hero Sword in the sword slot.");
+  private MythicFragmentService.Inspection inspect(ItemStack target, ItemStack fragment) {
+    if (target == null || target.getAmount() != 1) {
+      return MythicFragmentService.Inspection.invalid(
+          "Place one Hero Sword or Hero Armor piece in the target slot.");
+    }
+    boolean sword = heroItemService.isHeroSword(target);
+    boolean armor = heroArmorService != null && heroArmorService.isHeroArmor(target);
+    if (!sword && !armor) {
+      return MythicFragmentService.Inspection.invalid(
+          "Place one Hero Sword or Hero Armor piece in the target slot.");
     }
     if (fragment == null || fragment.getAmount() < 1) {
       return MythicFragmentService.Inspection.invalid(
-          "Place a configured Damage Fragment in the fragment slot.");
+          "Place a configured DAMAGE or ARMOR fragment in the fragment slot.");
     }
-    return mythicFragmentService.inspect(fragment);
+    MythicFragmentService.Inspection inspection = mythicFragmentService.inspect(fragment);
+    if (!inspection.isValid()) return inspection;
+    if (sword && !inspection.upgrade().isDamageSupported()) {
+      return MythicFragmentService.Inspection.invalid(
+          "Hero Swords require a configured DAMAGE fragment.");
+    }
+    if (armor && !inspection.upgrade().isArmorSupported()) {
+      return MythicFragmentService.Inspection.invalid(
+          "Hero Armor requires a configured ARMOR fragment.");
+    }
+    return inspection;
   }
 
   private void refresh() {
@@ -196,21 +243,26 @@ public final class ForgeGui implements GuiManager.Screen {
       }
     }
 
-    ItemStack sword = inventory.getItem(SWORD_SLOT);
+    ItemStack target = inventory.getItem(SWORD_SLOT);
     ItemStack fragment = inventory.getItem(FRAGMENT_SLOT);
-    MythicFragmentService.Inspection inspection = mythicFragmentService.inspect(fragment);
+    MythicFragmentService.Inspection inspection = inspect(target, fragment);
     int available = availableFragments(inspection, fragment);
     boolean canForge =
-        sword != null
-            && sword.getAmount() == 1
-            && heroItemService.isHeroSword(sword)
+        target != null
+            && target.getAmount() == 1
+            && (heroItemService.isHeroSword(target)
+                || (heroArmorService != null && heroArmorService.isHeroArmor(target)))
             && inspection.isValid()
             && available > 0;
 
     if (canForge) {
       MythicFragmentService.FragmentUpgrade upgrade = inspection.upgrade();
       batchAmount = Math.max(1, Math.min(batchAmount, available));
-      inventory.setItem(OUTPUT_SLOT, heroItemService.forge(sword, upgrade, batchAmount));
+      inventory.setItem(
+          OUTPUT_SLOT,
+          heroItemService.isHeroSword(target)
+              ? heroItemService.forge(target, upgrade, batchAmount)
+              : heroArmorService.forge(target, upgrade, batchAmount));
       inventory.setItem(
           FORGE_BUTTON_SLOT,
           namedItem(
@@ -223,7 +275,7 @@ public final class ForgeGui implements GuiManager.Screen {
     } else {
       inventory.setItem(
           OUTPUT_SLOT,
-          namedItem(Material.BARRIER, "Place a Hero Sword and Fragment", NamedTextColor.RED));
+          namedItem(Material.BARRIER, "Place a Hero item and Fragment", NamedTextColor.RED));
       inventory.setItem(
           FORGE_BUTTON_SLOT,
           namedItem(

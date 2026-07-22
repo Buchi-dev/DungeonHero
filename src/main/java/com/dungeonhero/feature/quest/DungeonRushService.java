@@ -4,6 +4,7 @@ import com.dungeonhero.common.BukkitPlayerResolver;
 import com.dungeonhero.common.ItemDeliveryService;
 import com.dungeonhero.common.PlayerResolver;
 import com.dungeonhero.config.DungeonHeroConfiguration;
+import com.dungeonhero.feature.armor.ArmorProgressionService;
 import com.dungeonhero.feature.coins.DungeonCoinService;
 import com.dungeonhero.feature.sword.SwordProgressionService;
 import java.util.List;
@@ -26,6 +27,7 @@ public final class DungeonRushService {
   private final JavaPlugin plugin;
   private final DungeonCoinService coinService;
   private final SwordProgressionService swordProgressionService;
+  private final ArmorProgressionService armorProgressionService;
   private final QuestScoringPolicy scoringPolicy = new QuestScoringPolicy();
   private final DungeonRushRoundState roundState = new DungeonRushRoundState(scoringPolicy);
   private final PlayerResolver playerResolver;
@@ -43,8 +45,10 @@ public final class DungeonRushService {
         plugin,
         coinService,
         swordProgressionService,
+        null,
         new BukkitPlayerResolver(),
-        new ItemDeliveryService());
+        new ItemDeliveryService(),
+        DungeonHeroConfiguration.load(plugin).dungeonRush());
   }
 
   public DungeonRushService(
@@ -57,6 +61,7 @@ public final class DungeonRushService {
         plugin,
         coinService,
         swordProgressionService,
+        null,
         playerResolver,
         itemDeliveryService,
         DungeonHeroConfiguration.load(plugin).dungeonRush());
@@ -66,12 +71,14 @@ public final class DungeonRushService {
       JavaPlugin plugin,
       DungeonCoinService coinService,
       SwordProgressionService swordProgressionService,
+      ArmorProgressionService armorProgressionService,
       PlayerResolver playerResolver,
       ItemDeliveryService itemDeliveryService,
       DungeonRushConfiguration configuration) {
     this.plugin = plugin;
     this.coinService = coinService;
     this.swordProgressionService = swordProgressionService;
+    this.armorProgressionService = armorProgressionService;
     this.playerResolver = playerResolver;
     this.itemDeliveryService = itemDeliveryService;
     reload(configuration);
@@ -102,7 +109,12 @@ public final class DungeonRushService {
     this.configuration = configuration;
     rewardDistributor =
         new DungeonRushRewardDistributor(
-            plugin, coinService, swordProgressionService, playerResolver, itemDeliveryService);
+            plugin,
+            coinService,
+            swordProgressionService,
+            armorProgressionService,
+            playerResolver,
+            itemDeliveryService);
     roundState.reset(System.currentTimeMillis(), configuration.firstDelayMinutes());
   }
 

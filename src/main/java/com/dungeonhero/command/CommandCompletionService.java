@@ -14,6 +14,7 @@ public final class CommandCompletionService {
           "give",
           "give-xp",
           "sword",
+          "armor",
           "rank",
           "rankup",
           "balance",
@@ -23,6 +24,7 @@ public final class CommandCompletionService {
           "party",
           "prestige",
           "dummy",
+          "arena",
           "version");
   private static final List<String> PARTY_SUBCOMMANDS =
       List.of("create", "invite", "accept", "info", "leave", "kick", "disband", "help");
@@ -52,6 +54,15 @@ public final class CommandCompletionService {
     }
     if (args.length == 2 && equals(args[0], "quest")) {
       return support.complete(args[1], List.of("top"));
+    }
+    if (args.length == 2 && equals(args[0], "arena")) {
+      return support.complete(args[1], List.of("escape", "end"));
+    }
+    if (args.length == 3 && equals(args[0], "arena") && equals(args[1], "end")) {
+      return support.complete(args[2], support.onlinePlayerNames());
+    }
+    if (args.length == 2 && equals(args[0], "armor")) {
+      return support.complete(args[1], List.of("forge"));
     }
     if (args.length == 2 && equals(args[0], "admin")) {
       return support.complete(args[1], List.of("coins", "resetsword"));

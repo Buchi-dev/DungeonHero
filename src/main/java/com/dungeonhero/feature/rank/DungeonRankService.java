@@ -22,6 +22,7 @@ public final class DungeonRankService {
   private final List<RankDefinition> ranks = new ArrayList<>();
   private String coinName;
   private int configuredSwordLevelCap;
+  private int configuredArmorLevelCap;
 
   public DungeonRankService(
       JavaPlugin plugin, HeroItemService heroItemService, DungeonCoinService coinService) {
@@ -48,6 +49,7 @@ public final class DungeonRankService {
     ranks.clear();
     coinName = configuration.ranks().coinName();
     configuredSwordLevelCap = configuration.progression().maxSwordLevel();
+    configuredArmorLevelCap = configuration.armor().maxLevel();
     for (DungeonHeroConfiguration.Rank rank : configuration.ranks().ranks()) {
       ranks.add(
           new RankDefinition(
@@ -55,6 +57,7 @@ public final class DungeonRankService {
               rank.name(),
               rank.requiredSwordLevel(),
               rank.swordLevelCap(),
+              rank.armorLevelCap(),
               rank.cost()));
     }
     if (ranks.isEmpty()) {
@@ -82,6 +85,10 @@ public final class DungeonRankService {
   public int getSwordLevelCap(Player player) {
     return rankPolicy.effectiveSwordLevelCap(
         configuredSwordLevelCap, getCurrentRank(player).swordLevelCap());
+  }
+
+  public int getArmorLevelCap(Player player) {
+    return Math.max(1, Math.min(configuredArmorLevelCap, getCurrentRank(player).armorLevelCap()));
   }
 
   /** Revalidates permanent unlocked access without downgrading a player's stored rank. */
@@ -207,13 +214,24 @@ public final class DungeonRankService {
               names[number - 1],
               number == 1 ? 1 : (number - 1) * 10,
               number * 10,
+              number * 10,
               number == 1 ? 0 : (long) Math.pow(2, number + 5)));
     }
     return defaults;
   }
 
   public record RankDefinition(
-      int number, String name, int requiredSwordLevel, int swordLevelCap, long cost) {}
+      int number,
+      String name,
+      int requiredSwordLevel,
+      int swordLevelCap,
+      int armorLevelCap,
+      long cost) {
+    public RankDefinition(
+        int number, String name, int requiredSwordLevel, int swordLevelCap, long cost) {
+      this(number, name, requiredSwordLevel, swordLevelCap, swordLevelCap, cost);
+    }
+  }
 
   public enum RankUpStatus {
     SUCCESS,

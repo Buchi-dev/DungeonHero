@@ -2,6 +2,7 @@ package com.dungeonhero.feature.quest;
 
 import com.dungeonhero.common.ItemDeliveryService;
 import com.dungeonhero.common.PlayerResolver;
+import com.dungeonhero.feature.armor.ArmorProgressionService;
 import com.dungeonhero.feature.coins.DungeonCoinService;
 import com.dungeonhero.feature.sword.SwordProgressionService;
 import java.util.ArrayList;
@@ -18,6 +19,7 @@ public final class DungeonRushRewardDistributor {
   private final JavaPlugin plugin;
   private final DungeonCoinService coinService;
   private final SwordProgressionService swordProgressionService;
+  private final ArmorProgressionService armorProgressionService;
   private final PlayerResolver playerResolver;
   private final ItemDeliveryService itemDeliveryService;
 
@@ -25,11 +27,13 @@ public final class DungeonRushRewardDistributor {
       JavaPlugin plugin,
       DungeonCoinService coinService,
       SwordProgressionService swordProgressionService,
+      ArmorProgressionService armorProgressionService,
       PlayerResolver playerResolver,
       ItemDeliveryService itemDeliveryService) {
     this.plugin = plugin;
     this.coinService = coinService;
     this.swordProgressionService = swordProgressionService;
+    this.armorProgressionService = armorProgressionService;
     this.playerResolver = playerResolver;
     this.itemDeliveryService = itemDeliveryService;
   }
@@ -52,6 +56,10 @@ public final class DungeonRushRewardDistributor {
           if (player != null && reward.amount() > 0) {
             swordProgressionService.awardQuestExperience(
                 player, (int) Math.min(Integer.MAX_VALUE, reward.amount()));
+            if (armorProgressionService != null) {
+              armorProgressionService.awardQuestExperience(
+                  player, (int) Math.min(Integer.MAX_VALUE, reward.amount()));
+            }
             summary.add("+" + reward.amount() + " Sword XP");
           }
         }

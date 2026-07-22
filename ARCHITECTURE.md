@@ -163,3 +163,25 @@ Canonical duplicate-key names are `HeroAscension.*` over
 `MobScaling.PartyScalingMode` over `MobScaling.PartyMode`. Legacy keys remain
 read-only compatibility aliases and emit a migration warning whenever they
 are present. The shipped config contains canonical keys only.
+
+## Hero Armor boundary
+
+Hero Armor is a sibling of the sword feature under `feature/armor`:
+
+- `HeroArmorState`, `ArmorTier`, `ArmorProgressionCalculator`,
+  `ArmorCapPolicy`, `ArmorProtectionPolicy`, `ArmorSetBonusPolicy`, and
+  `LastStandPolicy` are immutable or deterministic Bukkit-free domain objects.
+- `HeroArmorItemCodec` and `HeroArmorStorage` own PDC encoding and canonical
+  player persistence.
+- `HeroArmorService` owns item creation, normalization, and forge arithmetic at
+  the Bukkit boundary.
+- `ArmorProgressionService` receives the existing sword progression events so
+  rewards are mirrored without a second kill listener.
+- `HeroArmorListener` owns join, respawn, death, drop prevention, duplicate
+  normalization, and non-destructive restoration.
+- `ArmorProtectionListener` is the incoming player-damage adapter and applies
+  the pure defense and Last Stand decisions.
+
+The Forge remains the single transaction boundary for sword and armor inputs.
+The command router delegates `/dh armor` and `/dh armor forge` to a focused
+handler, while rank parsing exposes one rank-controlled cap for each system.

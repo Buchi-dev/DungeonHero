@@ -9,7 +9,7 @@ depend: [MythicMobs]
 commands:
   dungeonhero:
     description: Shows DungeonHero status and opens the Hero Forge.
-    usage: /dungeonhero [help|reload|forge|give|give-xp|sword|rank|rankup|balance|transfer|quest|party|prestige|dummy|admin|version]
+    usage: /dungeonhero [help|reload|forge|give|give-xp|sword|armor|rank|rankup|balance|transfer|quest|party|prestige|dummy|arena|admin|version]
     aliases: [dh]
 permissions:
   dungeonhero.admin:
@@ -22,6 +22,7 @@ permissions:
       dungeonhero.admin.dummy.remove: true
       dungeonhero.admin.dummy.remove-all: true
       dungeonhero.admin.resetsword: true
+      dungeonhero.admin.arena: true
   dungeonhero.admin.reload:
     description: Allows reloading DungeonHero configuration.
     default: false
@@ -39,6 +40,9 @@ permissions:
     default: false
   dungeonhero.admin.resetsword:
     description: Allows previewing and resetting a player's Hero Sword.
+    default: false
+  dungeonhero.admin.arena:
+    description: Allows ending a player's Blood Arena session.
     default: false
   dungeonhero.coins.balance:
     description: Allows viewing your Dungeon Coin balance.

@@ -122,7 +122,15 @@ public final class MythicFragmentService {
 
   public record FragmentUpgrade(String id, String stat, double amount) {
     public boolean isSupported() {
-      return "DAMAGE".equals(stat);
+      return isDamageSupported() || isArmorSupported();
+    }
+
+    public boolean isDamageSupported() {
+      return "DAMAGE".equalsIgnoreCase(stat);
+    }
+
+    public boolean isArmorSupported() {
+      return "ARMOR".equalsIgnoreCase(stat);
     }
   }
 

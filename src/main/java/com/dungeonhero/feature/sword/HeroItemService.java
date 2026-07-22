@@ -208,7 +208,7 @@ public final class HeroItemService {
 
   public ItemStack forge(
       ItemStack sword, MythicFragmentService.FragmentUpgrade upgrade, int quantity) {
-    if (!isHeroSword(sword) || upgrade == null || !upgrade.isSupported()) {
+    if (!isHeroSword(sword) || upgrade == null || !upgrade.isDamageSupported()) {
       throw new IllegalArgumentException(
           "The Hero Forge requires a valid Hero Sword and MythicMobs fragment.");
     }

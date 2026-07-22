@@ -196,6 +196,8 @@ public final class DungeonHeroMessages {
         List.of(
             command("/dh forge", "Open the Hero Forge"),
             command("/dh sword", "Show Hero Sword progression"),
+            command("/dh armor", "Show Hero Armor progression and set bonuses"),
+            command("/dh armor forge", "Open the Hero Forge for Hero Armor"),
             command("/dh rank", "Show Dungeon Rank and balance"),
             command("/dh rankup", "Spend Dungeon Coins to rank up"),
             command("/dh balance", "Show Dungeon Coin balance"),

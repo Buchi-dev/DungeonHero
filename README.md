@@ -378,3 +378,65 @@ DungeonHero:
 ```
 
 When enabled, normal Minecraft XP gain is blocked so the HUD remains dedicated to Sword XP. Set `UseVanillaXpBar` to `false` if the server needs to use normal Minecraft experience.
+
+## Hero Armor — Aegis of the Fallen
+
+Hero Armor is one shared progression system represented by a Helmet, Chestplate,
+Leggings, and Boots. All four pieces share the player’s Armor Level, Armor XP,
+and Armor Bonus. The canonical state is stored on the player; each physical
+piece carries mirrored PDC metadata so it can be identified and normalized.
+
+Armor receives the same XP awards as the sword for mob kills, MythicMob kills,
+Dungeon Rush Sword XP rewards, and manual Sword XP item pickup. Armor uses the
+same XP curve and rank-controlled cap, with `ArmorLevelCap` falling back to
+`SwordLevelCap` when omitted.
+
+```text
+/dh armor
+/dh armor forge
+```
+
+The Forge accepts either a Hero Sword with a `DAMAGE` fragment or one Hero
+Armor piece with an `ARMOR` fragment. Batch quantities consume only the selected
+fragment count. Closing the GUI returns both inputs through the normal safe
+delivery path.
+
+Armor protection scales from Armor Level and effective, rank-capped Armor
+Bonus. Stored overflow is preserved and becomes active as the player unlocks
+higher ranks. Two equipped pieces grant 2% damage reduction, three grant 5%,
+and a complete set activates Last Stand: once every 30 seconds, lethal damage
+at or below 30% maximum health is cancelled and the player is restored to 30%.
+
+```yaml
+DungeonHero:
+  Armor:
+    Enabled: true
+    MaxLevel: 100
+    LevelReductionPerLevel: 0.0015
+    MaxLevelReduction: 0.15
+    FragmentReductionPerPoint: 0.01
+    MaxFragmentReduction: 0.20
+    MaxTotalReduction: 0.40
+    LastStandHealthThreshold: 0.30
+    LastStandCooldownSeconds: 30
+    MaximumStoredArmor: 100000
+    RankCaps:
+      1: 10
+      2: 20
+      3: 35
+      10: 280
+  Ranks:
+    List:
+      "1":
+        Name: Novice
+        RequiredSwordLevel: 1
+        SwordLevelCap: 10
+        ArmorLevelCap: 10
+        Cost: 0
+```
+
+Hero Armor is unbreakable and cannot be dropped. On join, respawn, and reload,
+duplicates are removed, missing pieces are rebuilt from canonical state, and
+normal armor or inventory items are never overwritten. If a normal armor item
+occupies a required slot, the Hero Armor piece is delivered to the inventory or
+dropped safely when the inventory is full.

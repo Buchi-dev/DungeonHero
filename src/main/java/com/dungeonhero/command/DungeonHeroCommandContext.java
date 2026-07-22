@@ -1,5 +1,9 @@
 package com.dungeonhero.command;
 
+import com.dungeonhero.feature.armor.ArmorProgressionService;
+import com.dungeonhero.feature.armor.ArmorProtectionListener;
+import com.dungeonhero.feature.armor.HeroArmorListener;
+import com.dungeonhero.feature.armor.HeroArmorService;
 import com.dungeonhero.feature.coins.DungeonCoinService;
 import com.dungeonhero.feature.forge.ForgeGui;
 import com.dungeonhero.feature.mobregistry.MobRegistryService;
@@ -26,6 +30,10 @@ public record DungeonHeroCommandContext(
     JavaPlugin plugin,
     HeroItemService heroItemService,
     HeroSwordStorage heroSwordStorage,
+    HeroArmorService heroArmorService,
+    HeroArmorListener heroArmorListener,
+    ArmorProgressionService armorProgressionService,
+    ArmorProtectionListener armorProtectionListener,
     HeroPlayerListener heroPlayerListener,
     MythicFragmentService mythicFragmentService,
     HeroSwordMobScaler heroSwordMobScaler,

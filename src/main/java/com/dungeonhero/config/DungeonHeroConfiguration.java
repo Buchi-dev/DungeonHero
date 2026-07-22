@@ -24,6 +24,7 @@ public record DungeonHeroConfiguration(
     SwordXpItem swordXpItem,
     Ascension ascension,
     FragmentCaps fragmentCaps,
+    Armor armor,
     Map<String, Fragment> fragments,
     Ranks ranks,
     Hud hud,
@@ -47,12 +48,14 @@ public record DungeonHeroConfiguration(
     Progression progression = readProgression(reader, swordXpItem.xp());
     Ascension ascension = readAscension(reader);
     FragmentCaps fragmentCaps = readFragmentCaps(reader);
+    Armor armor = readArmor(reader);
     return new DungeonHeroConfiguration(
         reader.string(Keys.LOCALE, DEFAULT_LOCALE),
         progression,
         swordXpItem,
         ascension,
         fragmentCaps,
+        armor,
         readFragments(reader),
         readRanks(reader),
         readHud(reader),
@@ -145,6 +148,30 @@ public record DungeonHeroConfiguration(
         Map.copyOf(caps));
   }
 
+  private static Armor readArmor(Reader reader) {
+    Map<Integer, Double> caps = new LinkedHashMap<>();
+    for (int rank = 1; rank <= Defaults.MAX_RANK; rank++) {
+      caps.put(
+          rank,
+          reader.atLeastDouble(
+              Keys.ARMOR_RANK_CAPS + rank,
+              Defaults.RANK_CAPS.getOrDefault(rank, Defaults.MAX_RANK_CAP),
+              0));
+    }
+    return new Armor(
+        reader.bool(Keys.ARMOR_ENABLED, true),
+        reader.positiveInt(Keys.ARMOR_MAX_LEVEL, Defaults.MAX_ARMOR_LEVEL),
+        reader.atLeastDouble(Keys.ARMOR_LEVEL_REDUCTION, .0015, 0),
+        reader.atLeastDouble(Keys.ARMOR_MAX_LEVEL_REDUCTION, .15, 0),
+        reader.atLeastDouble(Keys.ARMOR_FRAGMENT_REDUCTION, .01, 0),
+        reader.atLeastDouble(Keys.ARMOR_MAX_FRAGMENT_REDUCTION, .20, 0),
+        reader.atLeastDouble(Keys.ARMOR_MAX_TOTAL_REDUCTION, .40, 0),
+        reader.atLeastDouble(Keys.ARMOR_LAST_STAND_THRESHOLD, .30, 0),
+        reader.atLeastLong(Keys.ARMOR_LAST_STAND_COOLDOWN, 30, 1),
+        reader.atLeastDouble(Keys.ARMOR_MAXIMUM_STORED, 100000, 0),
+        Map.copyOf(caps));
+  }
+
   private static Map<String, Fragment> readFragments(Reader reader) {
     ConfigurationSection section = reader.config().getConfigurationSection(Keys.FRAGMENTS);
     if (section == null) return Map.of();
@@ -179,6 +206,11 @@ public record DungeonHeroConfiguration(
                   rank.getString("Name", "Rank " + number),
                   Math.max(1, rank.getInt("RequiredSwordLevel", number == 1 ? 1 : 10)),
                   Math.max(1, rank.getInt("SwordLevelCap", 100)),
+                  Math.max(
+                      1,
+                      rank.contains("ArmorLevelCap")
+                          ? rank.getInt("ArmorLevelCap", 100)
+                          : rank.getInt("SwordLevelCap", 100)),
                   Math.max(0, rank.getLong("Cost", 0))));
         } catch (NumberFormatException ignored) {
           reader.warn("Ignoring invalid DungeonHero rank key: " + key);
@@ -360,12 +392,34 @@ public record DungeonHeroConfiguration(
 
   public record FragmentCaps(double maximumStoredDamage, Map<Integer, Double> rankCaps) {}
 
+  public record Armor(
+      boolean enabled,
+      int maxLevel,
+      double levelReductionPerLevel,
+      double maxLevelReduction,
+      double fragmentReductionPerPoint,
+      double maxFragmentReduction,
+      double maxTotalReduction,
+      double lastStandHealthThreshold,
+      long lastStandCooldownSeconds,
+      double maximumStoredArmor,
+      Map<Integer, Double> rankCaps) {}
+
   public record Fragment(String id, String type, String stat, double amount) {}
 
   public record Ranks(String coinName, List<Rank> ranks) {}
 
   public record Rank(
-      int number, String name, int requiredSwordLevel, int swordLevelCap, long cost) {}
+      int number,
+      String name,
+      int requiredSwordLevel,
+      int swordLevelCap,
+      int armorLevelCap,
+      long cost) {
+    public Rank(int number, String name, int requiredSwordLevel, int swordLevelCap, long cost) {
+      this(number, name, requiredSwordLevel, swordLevelCap, swordLevelCap, cost);
+    }
+  }
 
   public record Hud(boolean useVanillaXpBar, long updateTicks) {}
 
@@ -438,6 +492,7 @@ public record DungeonHeroConfiguration(
     private static final int MAX_RANK = 10;
     private static final double MAX_RANK_CAP = 280;
     private static final double MAX_STORED_DAMAGE = 100000;
+    private static final int MAX_ARMOR_LEVEL = 100;
     private static final boolean HUD_ENABLED = true;
     private static final long HUD_UPDATE_TICKS = 10;
     private static final boolean MOB_SCALING_ENABLED = true;
@@ -496,6 +551,21 @@ public record DungeonHeroConfiguration(
     private static final String FRAGMENT_MAX_DAMAGE =
         "DungeonHero.FragmentCaps.MaximumStoredDamage";
     private static final String FRAGMENT_RANK_CAPS = "DungeonHero.FragmentCaps.RankCaps.";
+    private static final String ARMOR_ENABLED = "DungeonHero.Armor.Enabled";
+    private static final String ARMOR_MAX_LEVEL = "DungeonHero.Armor.MaxLevel";
+    private static final String ARMOR_LEVEL_REDUCTION = "DungeonHero.Armor.LevelReductionPerLevel";
+    private static final String ARMOR_MAX_LEVEL_REDUCTION = "DungeonHero.Armor.MaxLevelReduction";
+    private static final String ARMOR_FRAGMENT_REDUCTION =
+        "DungeonHero.Armor.FragmentReductionPerPoint";
+    private static final String ARMOR_MAX_FRAGMENT_REDUCTION =
+        "DungeonHero.Armor.MaxFragmentReduction";
+    private static final String ARMOR_MAX_TOTAL_REDUCTION = "DungeonHero.Armor.MaxTotalReduction";
+    private static final String ARMOR_LAST_STAND_THRESHOLD =
+        "DungeonHero.Armor.LastStandHealthThreshold";
+    private static final String ARMOR_LAST_STAND_COOLDOWN =
+        "DungeonHero.Armor.LastStandCooldownSeconds";
+    private static final String ARMOR_MAXIMUM_STORED = "DungeonHero.Armor.MaximumStoredArmor";
+    private static final String ARMOR_RANK_CAPS = "DungeonHero.Armor.RankCaps.";
     private static final String LEGACY_FRAGMENT_CAPS = "DungeonHero.Fragments.Caps.";
     private static final String COIN_NAME = "DungeonHero.Ranks.CoinName";
     private static final String RANK_LIST = "DungeonHero.Ranks.List";
@@ -617,7 +687,10 @@ public record DungeonHeroConfiguration(
     }
 
     private double doubleValue(String canonical, double fallback, String... legacy) {
-      return config.getDouble(select(canonical, legacy), fallback);
+      double value = config.getDouble(select(canonical, legacy), fallback);
+      if (Double.isFinite(value)) return value;
+      warn("Configuration key '" + canonical + "' must be finite; using " + fallback + ".");
+      return fallback;
     }
 
     private double atLeastDouble(

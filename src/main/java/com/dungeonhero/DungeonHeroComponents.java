@@ -6,6 +6,13 @@ import com.dungeonhero.common.ItemDeliveryService;
 import com.dungeonhero.common.MythicDeathDeduplicator;
 import com.dungeonhero.common.PlayerResolver;
 import com.dungeonhero.config.DungeonHeroConfiguration;
+import com.dungeonhero.feature.arena.ArenaBoundaryListener;
+import com.dungeonhero.feature.arena.ArenaConfiguration;
+import com.dungeonhero.feature.arena.ArenaSessionManager;
+import com.dungeonhero.feature.armor.ArmorProgressionService;
+import com.dungeonhero.feature.armor.ArmorProtectionListener;
+import com.dungeonhero.feature.armor.HeroArmorListener;
+import com.dungeonhero.feature.armor.HeroArmorService;
 import com.dungeonhero.feature.coins.DungeonCoinService;
 import com.dungeonhero.feature.forge.ForgeGui;
 import com.dungeonhero.feature.mobregistry.MobRegistryService;
@@ -49,6 +56,10 @@ public final class DungeonHeroComponents {
   private final PlayerResolver playerResolver;
   private final HeroItemService heroItemService;
   private final HeroSwordStorage heroSwordStorage;
+  private final HeroArmorService heroArmorService;
+  private final HeroArmorListener heroArmorListener;
+  private final ArmorProgressionService armorProgressionService;
+  private final ArmorProtectionListener armorProtectionListener;
   private final MythicFragmentService mythicFragmentService;
   private final DungeonCoinService dungeonCoinService;
   private final DungeonRankService dungeonRankService;
@@ -68,6 +79,8 @@ public final class DungeonHeroComponents {
   private final MessageService messageService;
   private final HeroDamageProtectionListener damageProtectionListener;
   private final HeroRareDropBonusListener rareDropBonusListener;
+  private final ArenaSessionManager arenaSessionManager;
+  private final ArenaBoundaryListener arenaBoundaryListener;
   private final SwordProgressionListener swordProgressionListener;
   private final DungeonHeroCommand command;
   private DungeonHeroConfiguration configuration;
@@ -89,6 +102,7 @@ public final class DungeonHeroComponents {
     heroItemService =
         new HeroItemService(plugin, itemDeliveryService, configuration.fragmentCaps());
     heroSwordStorage = new HeroSwordStorage(plugin, heroItemService);
+    heroArmorService = new HeroArmorService(plugin, itemDeliveryService, configuration.armor());
     mythicFragmentService = new MythicFragmentService(plugin);
     dungeonCoinService = new DungeonCoinService(plugin);
     dungeonRankService =
@@ -102,7 +116,13 @@ public final class DungeonHeroComponents {
             configuration.ascension());
     guiManager = new GuiManager();
     forgeGui =
-        new ForgeGui(plugin, guiManager, heroItemService, mythicFragmentService, heroSwordStorage);
+        new ForgeGui(
+            plugin,
+            guiManager,
+            heroItemService,
+            mythicFragmentService,
+            heroSwordStorage,
+            heroArmorService);
     partyService = new PartyService(plugin, playerResolver, configuration.party());
     trainingDummyService =
         new TrainingDummyService(plugin, heroItemService, configuration.trainingDummy());
@@ -116,11 +136,19 @@ public final class DungeonHeroComponents {
             heroSwordStorage,
             mobRegistryService,
             configuration);
+    armorProgressionService =
+        new ArmorProgressionService(
+            plugin, heroArmorService, dungeonRankService, mobRegistryService, configuration);
+    heroArmorListener = new HeroArmorListener(plugin, heroArmorService, dungeonRankService);
+    armorProtectionListener =
+        new ArmorProtectionListener(
+            plugin, heroArmorService, dungeonRankService, configuration.armor());
     dungeonRushService =
         new DungeonRushService(
             plugin,
             dungeonCoinService,
             swordProgressionService,
+            armorProgressionService,
             playerResolver,
             itemDeliveryService,
             configuration.dungeonRush());
@@ -152,13 +180,24 @@ public final class DungeonHeroComponents {
             mobRegistryService,
             configuration.ascension());
     swordProgressionListener =
-        new SwordProgressionListener(plugin, swordProgressionService, mythicDeathDeduplicator);
+        new SwordProgressionListener(
+            plugin,
+            swordProgressionService,
+            mythicDeathDeduplicator,
+            armorProgressionService,
+            swordXpItemService);
+    arenaSessionManager = new ArenaSessionManager(plugin, ArenaConfiguration.load(plugin));
+    arenaBoundaryListener = new ArenaBoundaryListener(arenaSessionManager);
 
     command =
         new DungeonHeroCommand(
             plugin,
             heroItemService,
             heroSwordStorage,
+            heroArmorService,
+            heroArmorListener,
+            armorProgressionService,
+            armorProtectionListener,
             heroPlayerListener,
             mythicFragmentService,
             heroSwordMobScaler,
@@ -176,6 +215,7 @@ public final class DungeonHeroComponents {
             dungeonRushService,
             heroAscensionService,
             rareDropBonusListener,
+            arenaSessionManager,
             this::reload);
 
     registerModules();
@@ -274,6 +314,17 @@ public final class DungeonHeroComponents {
             null));
     modules.register(
         new PluginModule(
+            "armor-progression",
+            null,
+            null,
+            () -> {
+              heroArmorService.reload(configuration.armor(), plugin);
+              armorProgressionService.reload(configuration);
+            },
+            null,
+            null));
+    modules.register(
+        new PluginModule(
             "ascension",
             null,
             null,
@@ -314,6 +365,14 @@ public final class DungeonHeroComponents {
             null));
     modules.register(
         new PluginModule(
+            "armor-protection",
+            armorProtectionListener,
+            null,
+            () -> armorProtectionListener.reload(configuration.armor()),
+            null,
+            null));
+    modules.register(
+        new PluginModule(
             "rare-drop-bonus",
             rareDropBonusListener,
             null,
@@ -337,6 +396,22 @@ public final class DungeonHeroComponents {
             null,
             null));
     modules.register(new PluginModule("hero-player", heroPlayerListener, null, null, null, null));
+    modules.register(
+        new PluginModule(
+            "blood-arena",
+            arenaBoundaryListener,
+            null,
+            () -> arenaSessionManager.reload(ArenaConfiguration.load(plugin)),
+            arenaSessionManager::start,
+            arenaSessionManager::close));
+    modules.register(
+        new PluginModule(
+            "hero-armor-player",
+            heroArmorListener,
+            null,
+            heroArmorListener::restoreOnlinePlayers,
+            null,
+            null));
     modules.register(new PluginModule("gui", guiManager, null, null, null, guiManager::closeAll));
   }
 }

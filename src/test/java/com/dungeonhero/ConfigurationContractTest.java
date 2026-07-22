@@ -22,6 +22,7 @@ class ConfigurationContractTest {
             "DungeonHero.Locale",
             "DungeonHero.Gameplay.ConfigVersion",
             "DungeonHero.Gameplay.Features.open-world-dungeon",
+            "DungeonHero.Gameplay.Features.blood-arena",
             "DungeonHero.Fragments.mm:HeroDamageFragment",
             "DungeonHero.Progression.SwordXPItem.Material",
             "DungeonHero.Progression.MaxSwordLevel",
